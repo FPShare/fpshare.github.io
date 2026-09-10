@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+<title>Live Coder — Code Share</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family:'Segoe UI', system-ui, -apple-system, sans-serif;
+    background:#1A1A1A; color:#E0E0E0;
+    display:flex; flex-direction:column;
+  }
+  a { color:#6C63FF; text-decoration:none; }
+  button {
+    cursor:pointer; font-family:inherit; border:none;
+    background:#6C63FF; color:#fff; padding:8px 14px;
+    border-radius:6px; transition:.15s; font-size:0.85rem;
+    display:inline-flex; align-items:center; gap:6px;
+    min-height:36px;
+  }
+  button:hover { opacity:.85; }
+  button:active { transform:scale(0.97); }
+  button.ghost { background:#2A2A2A; color:#CCC; }
+  button.danger { background:#d32f2f; }
+  button.success { background:#2e7d32; }
+  input, select, textarea {
+    font-family:inherit; padding:8px 12px; border-radius:6px;
+    border:1px solid #333; background:#2A2A2A; color:#E0E0E0;
+    width:100%; font-size:0.9rem;
+  }
+  input:focus, select:focus, textarea:focus { outline:2px solid #6C63FF; border-color:transparent; }
+
+  /* HEADER */
+  header {
+    background:#121212; padding:8px 0;
+    border-bottom:1px solid #2A2A2A; flex-shrink:0;
+  }
+  .container { max-width:100%; margin:0 auto; padding:0 14px; }
+  .header-inner { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .logo { font-size:1.15rem; font-weight:700; color:#fff; white-space:nowrap; }
+  .logo span { color:#6C63FF; }
+  .header-left { display:flex; align-items:center; gap:10px; }
+  #statusBar {
+    display:flex; align-items:center; gap:7px;
+    font-size:0.7rem; background:#1E1E1E;
+    padding:3px 10px 3px 7px; border-radius:30px;
+    border:1px solid #333;
+  }
+  #statusDot { width:8px; height:8px; border-radius:50%; background:#4CAF50; }
+  #statusDot.cloud { background:#4CAF50; }
+  #statusDot.local { background:#FF9800; }
+  #statusDot.offline { background:#f44336; }
+  .hamburger {
+    background:transparent; color:#E0E0E0; font-size:1.5rem;
+    padding:4px 8px; line-height:1; border-radius:6px; min-height:auto;
+  }
+  .hamburger:hover { background:#2A2A2A; }
+  .nav-dropdown {
+    position:absolute; top:52px; right:10px;
+    background:#1E1E1E; border:1px solid #333;
+    border-radius:10px; padding:8px 0;
+    min-width:200px; box-shadow:0 8px 30px rgba(0,0,0,.7);
+    display:none; flex-direction:column; z-index:999;
+  }
+  .nav-dropdown.open { display:flex; }
+  .nav-dropdown a {
+    padding:10px 18px; color:#D0D0D0; display:flex;
+    align-items:center; gap:10px; font-size:0.9rem;
+  }
+  .nav-dropdown a:hover { background:#2A2A2A; color:#fff; }
+  .nav-dropdown a i { width:18px; text-align:center; }
+  .header-right { position:relative; }
+
+  /* WORKSPACE */
+  .workspace {
+    flex:1; display:flex; flex-direction:column;
+    min-height:0; overflow:hidden;
+  }
+  .toolbar {
+    background:#161616; border-bottom:1px solid #2A2A2A;
+    padding:8px 14px; display:flex; gap:8px; align-items:center;
+    flex-wrap:wrap; flex-shrink:0;
+  }
+  .toolbar select, .toolbar input {
+    width:auto; min-width:120px; padding:6px 10px;
+    margin:0; font-size:0.85rem;
+  }
+  .panes {
+    flex:1; display:grid; grid-template-columns:1fr 1fr;
+    min-height:0; overflow:hidden;
+  }
+  .pane {
+    display:flex; flex-direction:column; min-height:0;
+    background:#0D0D0D; border-right:1px solid #2A2A2A;
+  }
+  .pane:last-child { border-right:none; }
+  .pane-header {
+    background:#161616; padding:6px 12px;
+    font-size:0.8rem; color:#AAA; display:flex;
+    justify-content:space-between; align-items:center;
+    border-bottom:1px solid #2A2A2A; flex-shrink:0;
+  }
+  .editor-wrap { flex:1; min-height:0; position:relative; overflow:hidden; }
+  #codeEditor {
+    width:100%; height:100%; resize:none;
+    border:none; border-radius:0;
+    background:#0D0D0D; color:#E0E0E0;
+    font-family:'Courier New', monospace; font-size:0.9rem;
+    padding:14px; line-height:1.5;
+    tab-size:4;
+  }
+  #codeEditor:focus { outline:none; }
+
+  #previewFrame {
+    width:100%; height:100%; border:none; background:#fff;
+    display:block;
+  }
+  #terminal {
+    width:100%; height:100%;
+    background:#000; color:#0f0;
+    font-family:'Courier New', monospace; font-size:0.85rem;
+    padding:12px; overflow-y:auto; white-space:pre-wrap;
+    word-break:break-word;
+  }
+  #terminal .err { color:#ff5555; }
+  #terminal .ok { color:#4CAF50; }
+  #terminal .info { color:#6C63FF; }
+  #terminal .dim { color:#888; }
+
+  /* AI PANEL */
+  .ai-panel {
+    background:#161616; border-top:1px solid #2A2A2A;
+    padding:10px 14px; flex-shrink:0;
+    display:none;
+  }
+  .ai-panel.open { display:block; }
+  .ai-panel h4 { font-size:0.85rem; color:#6C63FF; margin-bottom:8px; }
+  .ai-row { display:flex; gap:8px; }
+  .ai-row input { flex:1; margin:0; }
+  #aiOutput {
+    margin-top:10px; background:#0D0D0D;
+    border:1px solid #2A2A2A; border-radius:6px;
+    padding:10px; max-height:180px; overflow-y:auto;
+    font-size:0.85rem; line-height:1.5; white-space:pre-wrap;
+    font-family:'Courier New', monospace;
+  }
+
+  /* MOBILE TABS */
+  .mobile-tabs {
+    display:none; background:#161616;
+    border-bottom:1px solid #2A2A2A; padding:6px 14px; gap:6px;
+    flex-shrink:0;
+  }
+  .mobile-tabs button { flex:1; background:#2A2A2A; color:#888; }
+  .mobile-tabs button.active { background:#6C63FF; color:#fff; }
+
+  @media (max-width:800px) {
+    .panes { grid-template-columns:1fr; }
+    .pane { display:none; }
+    .pane.mobile-active { display:flex; }
+    .mobile-tabs { display:flex; }
+    .logo { font-size:1rem; }
+    #statusBar { font-size:0.65rem; padding:3px 8px 3px 6px; }
+    .toolbar { padding:6px 10px; gap:6px; }
+    .toolbar select, .toolbar input { min-width:90px; font-size:0.8rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container header-inner">
+    <div class="header-left">
+      <div class="logo">Live<span>Coder</span></div>
+      <div id="statusBar">
+        <span id="statusDot" class="cloud"></span>
+        <span id="statusText">Cloud</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <button class="hamburger" id="hamburgerBtn"><i class="fas fa-ellipsis-v"></i></button>
+      <nav class="nav-dropdown" id="navDropdown">
+        <a href="index.html"><i class="fas fa-home"></i> Code Share</a>
+        <a href="fpshare.html"><i class="fas fa-upload"></i> FPShare (Upload)</a>
+        <a href="#" id="saveProjectBtn"><i class="fas fa-save"></i> Save Project</a>
+        <a href="#" id="loadProjectBtn"><i class="fas fa-folder-open"></i> Open Project</a>
+        <a href="#" id="toggleAiBtn"><i class="fas fa-robot"></i> AI Assistant</a>
+        <a href="#" id="logoutBtn" style="display:none;"><i class="fas fa-sign-out-alt"></i> Logout</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<div class="workspace">
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <select id="languageSelect"></select>
+    <input type="text" id="fileName" placeholder="File name" value="untitled" style="min-width:140px;" />
+    <button id="runBtn" class="success"><i class="fas fa-play"></i> Run</button>
+    <button id="uploadBtn" class="ghost"><i class="fas fa-cloud-upload-alt"></i> Upload to Code Share</button>
+    <button id="clearBtn" class="ghost"><i class="fas fa-eraser"></i> Clear</button>
+  </div>
+
+  <!-- MOBILE TABS -->
+  <div class="mobile-tabs">
+    <button data-tab="editor" class="active"><i class="fas fa-code"></i> Editor</button>
+    <button data-tab="preview"><i class="fas fa-eye"></i> Preview</button>
+  </div>
+
+  <!-- PANES -->
+  <div class="panes">
+    <div class="pane mobile-active" id="pane-editor">
+      <div class="pane-header"><span><i class="fas fa-code"></i> Editor</span><span id="editorLang">HTML</span></div>
+      <div class="editor-wrap">
+        <textarea id="codeEditor" spellcheck="false"></textarea>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-preview">
+      <div class="pane-header">
+        <span><i class="fas fa-eye"></i> <span id="previewLabel">Preview</span></span>
+        <span id="previewStatus" class="text-muted" style="color:#888;">Idle</span>
+      </div>
+      <iframe id="previewFrame" sandbox="allow-scripts allow-modals allow-forms allow-popups"></iframe>
+      <div id="terminal" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- AI PANEL -->
+  <div class="ai-panel" id="aiPanel">
+    <h4><i class="fas fa-robot"></i> AI Coding Assistant (Groq / Llama 3.3)</h4>
+    <div class="ai-row">
+      <input type="text" id="aiPrompt" placeholder="Ask anything: 'explain this code', 'find the bug', 'optimize'..." />
+      <button id="aiAskBtn"><i class="fas fa-paper-plane"></i> Ask</button>
+    </div>
+    <div id="aiOutput" style="display:none;"></div>
+  </div>
+</div>
+
+<script>
+// ===== CONFIG =====
+const CONFIG = {
+  masterKey: '$2a$10$V6E8iLbl6jIkCLCbwaGj4uoQubBS0uhB2sBWm.t8xafNFSNlqWYO6',
+  accessKey: '$2a$10$JA6QOUKOY5qL0x2h5Q3U2eHJ6BHP1bO9lEC/LZyWhbH11pyhezdOy',
+  binId: '6aa218e1ffd5d16053f4561d',
+  baseUrl: 'https://api.jsonbin.io/v3/b',
+  groqKey: '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',
+  groqModel: 'llama-3.3-70b-versatile',
+  pistonUrl: 'https://emkc.org/api/v2/piston/execute',
+  languages: {
+    'HTML':       { type:'web',  piston:null,        ext:'html' },
+    'CSS':        { type:'web',  piston:null,        ext:'css' },
+    'JavaScript': { type:'web',  piston:'javascript',ext:'js' },
+    'TypeScript': { type:'piston', piston:'typescript', ext:'ts' },
+    'Python':     { type:'piston', piston:'python',  ext:'py' },
+    'Java':       { type:'piston', piston:'java',    ext:'java' },
+    'C':          { type:'piston', piston:'c',       ext:'c' },
+    'C++':        { type:'piston', piston:'c++',     ext:'cpp' },
+    'C#':         { type:'piston', piston:'csharp',  ext:'cs' },
+    'Ruby':       { type:'piston', piston:'ruby',    ext:'rb' },
+    'Go':         { type:'piston', piston:'go',      ext:'go' },
+    'Rust':       { type:'piston', piston:'rust',    ext:'rs' },
+    'PHP':        { type:'piston', piston:'php',     ext:'php' },
+    'Swift':      { type:'piston', piston:'swift',   ext:'swift' },
+    'Kotlin':     { type:'piston', piston:'kotlin',  ext:'kt' },
+    'SQL':        { type:'piston', piston:'sqlite3', ext:'sql' },
+    'Bash':       { type:'piston', piston:'bash',    ext:'sh' }
+  }
+};
+
+const $ = id => document.getElementById(id);
+const editor = $('codeEditor');
+let currentUser = null;
+
+// ===== STATUS =====
+function setStatus(mode, msg) {
+  const dot = $('statusDot'), text = $('statusText');
+  dot.className = '';
+  if (mode === 'cloud') { dot.classList.add('cloud'); text.textContent = msg||'Cloud'; }
+  else if (mode === 'local') { dot.classList.add('local'); text.textContent = msg||'Local'; }
+  else { dot.classList.add('offline'); text.textContent = msg||'Offline'; }
+}
+
+// ===== DB HELPERS =====
+async function fetchDB() {
+  try {
+    const res = await fetch(`${CONFIG.baseUrl}/${CONFIG.binId}/latest`, {
+      headers: { 'X-Master-Key': CONFIG.masterKey, 'X-Access-Key': CONFIG.accessKey }
+    });
+    if (!res.ok) throw new Error();
+    const d = await res.json();
+    setStatus('cloud','Cloud');
+    return d.record || { users:[], codes:[] };
+  } catch(e) {
+    setStatus('local','Local');
+    const c = localStorage.getItem('fpshare_db');
+    return c ? JSON.parse(c) : { users:[], codes:[] };
+  }
+}
+async function saveDB(db) {
+  try {
+    const res = await fetch(`${CONFIG.baseUrl}/${CONFIG.binId}`, {
+      method:'PUT',
+      headers:{
+        'Content-Type':'application/json',
+        'X-Master-Key': CONFIG.masterKey,
+        'X-Access-Key': CONFIG.accessKey
+      },
+      body: JSON.stringify(db)
+    });
+    if (!res.ok) throw new Error();
+    setStatus('cloud','Cloud');
+    localStorage.setItem('fpshare_db', JSON.stringify(db));
+    return true;
+  } catch(e) {
+    setStatus('local','Local');
+    localStorage.setItem('fpshare_db', JSON.stringify(db));
+    return false;
+  }
+}
+
+// ===== SESSION =====
+function loadSession() {
+  const s = localStorage.getItem('codeshare_user');
+  if (s) { try { currentUser = JSON.parse(s); } catch(_){} }
+  $('logoutBtn').style.display = currentUser ? 'flex' : 'none';
+}
+
+// ===== TERMINAL =====
+function termWrite(text, cls) {
+  const t = $('terminal');
+  const line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.textContent = text;
+  t.appendChild(line);
+  t.scrollTop = t.scrollHeight;
+}
+function termClear() { $('terminal').innerHTML = ''; }
+
+// ===== PREVIEW SWITCH =====
+function usePreviewMode() {
+  $('previewFrame').style.display = 'block';
+  $('terminal').style.display = 'none';
+  $('previewLabel').textContent = 'Live Preview';
+}
+function useTerminalMode() {
+  $('previewFrame').style.display = 'none';
+  $('terminal').style.display = 'block';
+  $('previewLabel').textContent = 'Terminal';
+}
+
+// ===== RUN =====
+async function run() {
+  const lang = $('languageSelect').value;
+  const cfg = CONFIG.languages[lang];
+  if (!cfg) return;
+
+  $('previewStatus').textContent = 'Running...';
+
+  if (cfg.type === 'web') {
+    // Live preview in iframe
+    usePreviewMode();
+    const code = editor.value;
+    let html = '';
+    if (lang === 'HTML') html = code;
+    else if (lang === 'CSS') html = `<style>${code}</style><div style="padding:20px;font-family:sans-serif;">CSS Applied. Add HTML in the editor to see it styled.</div>`;
+    else if (lang === 'JavaScript') html = `<body style="background:#fff;font-family:monospace;padding:20px;"><div id="out"></div><script>
+      const origLog = console.log;
+      console.log = (...a) => { document.getElementById('out').innerHTML += a.join(' ') + '<br>'; origLog(...a); };
+      try { ${code} } catch(e) { document.getElementById('out').innerHTML += '<span style="color:red;">Error: '+e.message+'</span>'; }
+    <\/script></body>`;
+    $('previewFrame').srcdoc = html;
+    $('previewStatus').textContent = '✅ Rendered';
+    return;
+  }
+
+  // Piston execution
+  useTerminalMode();
+  termClear();
+  termWrite('▶ Running ' + lang + '...', 'info');
+
+  try {
+    const res = await fetch(CONFIG.pistonUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        language: cfg.piston,
+        version: '*',
+        files: [{ name: `main.${cfg.ext}`, content: editor.value }]
+      })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const run = data.run || {};
+    const compile = data.compile || {};
+
+    if (compile.stderr) {
+      termWrite('❌ Compile Error:', 'err');
+      termWrite(compile.stderr, 'err');
+      $('previewStatus').textContent = '❌ Compile error';
+      return;
+    }
+    if (run.stdout) {
+      termWrite('✅ Output:', 'ok');
+      termWrite(run.stdout);
+    }
+    if (run.stderr) {
+      termWrite('❌ Runtime Error:', 'err');
+      termWrite(run.stderr, 'err');
+      $('previewStatus').textContent = '❌ Runtime error';
+    } else if (run.stdout) {
+      $('previewStatus').textContent = '✅ Success';
+    } else {
+      termWrite('(No output)', 'dim');
+      $('previewStatus').textContent = '✅ Success (no output)';
+    }
+    if (run.code !== undefined) termWrite('\n[exit code: ' + run.code + ']', 'dim');
+  } catch(e) {
+    termWrite('❌ Network Error: ' + e.message, 'err');
+    termWrite('(Piston API may be down. Try again.)', 'dim');
+    $('previewStatus').textContent = '❌ Failed';
+  }
+}
+
+// ===== UPLOAD =====
+async function uploadToCodeShare() {
+  if (!currentUser) {
+    alert('Please login to Code Share (index.html) first, then come back.');
+    return;
+  }
+  const name = $('fileName').value.trim() || 'Untitled';
+  const lang = $('languageSelect').value;
+  const desc = prompt('Description:', '') || '';
+  const tagsStr = prompt('Tags (comma separated):', '') || '';
+  const tags = tagsStr.split(',').map(s=>s.trim()).filter(Boolean);
+
+  setStatus('local','Uploading...');
+  const db = await fetchDB();
+
+  const newCode = {
+    code_id: 'code_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
+    name, uploader: currentUser.username,
+    uploaderType: currentUser.role === 'admin' ? 'admin' : 'user',
+    description: desc, language: lang, tags,
+    timestamp: new Date().toISOString(),
+    content: editor.value, views: 0, reviews: []
+  };
+  db.codes.push(newCode);
+  const ok = await saveDB(db);
+  alert(ok ? '✅ Uploaded to Code Share!' : '⚠️ Saved locally, will sync.');
+}
+
+// ===== AI =====
+async function askAI() {
+  const prompt = $('aiPrompt').value.trim();
+  if (!prompt) return;
+  const out = $('aiOutput');
+  out.style.display = 'block';
+  out.textContent = '🤔 Thinking...';
+
+  const sys = `You are an expert coding assistant inside a live code editor. The user's current code is written in ${$('languageSelect').value}:
+
+\`\`\`${$('languageSelect').value.toLowerCase()}
+${editor.value}
+\`\`\`
+
+Answer concisely, helpfully, with code examples when relevant.`;
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + CONFIG.groqKey
+      },
+      body: JSON.stringify({
+        model: CONFIG.groqModel,
+        messages: [
+          { role: 'system', content: sys },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.5,
+        max_tokens: 1200
+      })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    out.textContent = data.choices?.[0]?.message?.content || 'No response.';
+  } catch(e) {
+    out.textContent = '❌ AI error: ' + e.message;
+  }
+}
+
+// ===== MOBILE TABS =====
+function setupMobileTabs() {
+  document.querySelectorAll('.mobile-tabs button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.mobile-tabs button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = btn.dataset.tab;
+      document.querySelectorAll('.pane').forEach(p=>p.classList.remove('mobile-active'));
+      $('pane-' + (tab === 'editor' ? 'editor' : 'preview')).classList.add('mobile-active');
+    });
+  });
+}
+
+// ===== INIT =====
+function init() {
+  // Language dropdown
+  const sel = $('languageSelect');
+  Object.keys(CONFIG.languages).forEach(l => {
+    const o = document.createElement('option');
+    o.value = o.textContent = l;
+    sel.appendChild(o);
+  });
+  sel.value = 'HTML';
+  $('editorLang').textContent = 'HTML';
+
+  // Default code
+  editor.value = `<h1 style="color:#6C63FF;">Hello from Live Coder!</h1>
+<p>Edit code and click <b>Run</b>.</p>
+<button onclick="alert('It works!')">Click Me</button>`;
+
+  loadSession();
+  setStatus('cloud','Cloud');
+  setupMobileTabs();
+
+  // Events
+  $('hamburgerBtn').addEventListener('click', e => {
+    e.stopPropagation();
+    $('navDropdown').classList.toggle('open');
+  });
+  document.addEventListener('click', () => $('navDropdown').classList.remove('open'));
+
+  $('runBtn').addEventListener('click', run);
+  $('uploadBtn').addEventListener('click', uploadToCodeShare);
+  $('clearBtn').addEventListener('click', () => {
+    if (confirm('Clear editor?')) editor.value = '';
+  });
+
+  sel.addEventListener('change', () => {
+    $('editorLang').textContent = sel.value;
+  });
+
+  $('logoutBtn').addEventListener('click', e => {
+    e.preventDefault();
+    currentUser = null;
+    localStorage.removeItem('codeshare_user');
+    $('logoutBtn').style.display = 'none';
+    alert('Logged out.');
+  });
+
+  $('toggleAiBtn').addEventListener('click', e => {
+    e.preventDefault();
+    $('aiPanel').classList.toggle('open');
+    $('navDropdown').classList.remove('open');
+  });
+  $('aiAskBtn').addEventListener('click', askAI);
+  $('aiPrompt').addEventListener('keydown', e => {
+    if (e.key === 'Enter') askAI();
+  });
+
+  $('saveProjectBtn').addEventListener('click', e => {
+    e.preventDefault();
+    const name = prompt('Project name:', $('fileName').value || 'MyProject');
+    if (!name) return;
+    const projects = JSON.parse(localStorage.getItem('lc_projects') || '{}');
+    projects[name] = {
+      name, language: sel.value,
+      content: editor.value,
+      savedAt: new Date().toISOString()
+    };
+    localStorage.setItem('lc_projects', JSON.stringify(projects));
+    alert('✅ Project saved: ' + name);
+  });
+
+  $('loadProjectBtn').addEventListener('click', e => {
+    e.preventDefault();
+    const projects = JSON.parse(localStorage.getItem('lc_projects') || '{}');
+    const names = Object.keys(projects);
+    if (!names.length) return alert('No saved projects yet.');
+    const choice = prompt('Open project:\n' + names.map((n,i)=>`${i+1}. ${n}`).join('\n') + '\n\nEnter name:');
+    if (!choice || !projects[choice]) return;
+    const p = projects[choice];
+    sel.value = p.language;
+    $('editorLang').textContent = p.language;
+    editor.value = p.content;
+    $('fileName').value = p.name;
+    alert('✅ Loaded: ' + p.name);
+  });
+
+  // Keyboard shortcut: Ctrl/Cmd+Enter to run
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      run();
+    }
+  });
+
+  // Tab key in editor inserts spaces
+  editor.addEventListener('keydown', e => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const s = editor.selectionStart;
+      editor.value = editor.value.substring(0, s) + '  ' + editor.value.substring(editor.selectionEnd);
+      editor.selectionStart = editor.selectionEnd = s + 2;
+    }
+  });
+}
+init();
+</script>
+</body>
+  </html>
