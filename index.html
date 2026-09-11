@@ -3,11 +3,10 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-<title>FPShare — Upload Code</title>
+<title>FPShare — Code Share</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html, body { height:100%; }
   body {
     font-family:'Segoe UI', system-ui, -apple-system, sans-serif;
     background:#1A1A1A; color:#E0E0E0; min-height:100vh;
@@ -19,30 +18,34 @@
     background:#6C63FF; color:#fff; padding:10px 18px;
     border-radius:8px; transition:.15s; font-size:0.95rem;
     display:inline-flex; align-items:center; gap:8px;
-    min-height:44px; /* touch friendly */
+    min-height:44px;
   }
   button:hover { opacity:.85; }
   button:active { transform:scale(0.97); }
   input, select, textarea {
     font-family:inherit; padding:12px 14px; border-radius:8px;
     border:1px solid #333; background:#2A2A2A; color:#E0E0E0;
-    width:100%; margin-bottom:12px; font-size:0.95rem;
-    min-height:44px;
+    width:100%; margin-bottom:12px; font-size:0.95rem; min-height:44px;
   }
-  input:focus, select:focus, textarea:focus {
-    outline:2px solid #6C63FF; border-color:transparent;
-  }
-  textarea { resize:vertical; min-height:120px; font-family:'Courier New', monospace; }
+  input:focus, select:focus, textarea:focus { outline:2px solid #6C63FF; border-color:transparent; }
+  textarea { resize:vertical; min-height:100px; }
   .container { max-width:1100px; margin:0 auto; padding:0 16px; width:100%; }
+  .page { display:none; padding:20px 0 80px; }
+  .page.active { display:block; }
   .card {
     background:#1E1E1E; border-radius:14px; padding:20px;
     margin-bottom:20px; border:1px solid #2A2A2A;
   }
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .grid-3 { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; }
   .flex { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
   .flex-between { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; }
+  .badge { background:#2A2A2A; padding:2px 12px; border-radius:30px; font-size:0.75rem; color:#AAA; }
   .text-muted { color:#888; font-size:0.9rem; }
   .mt-2 { margin-top:16px; }
-  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .review-item { border-bottom:1px solid #2A2A2A; padding:12px 0; }
+  .review-item:last-child { border:none; }
+  .star { color:#FFD700; letter-spacing:2px; }
 
   /* HEADER */
   header {
@@ -51,7 +54,7 @@
     position:sticky; top:0; z-index:100;
   }
   .header-inner { display:flex; justify-content:space-between; align-items:center; }
-  .logo { font-size:1.3rem; font-weight:700; color:#fff; }
+  .logo { font-size:1.4rem; font-weight:700; color:#fff; }
   .logo span { color:#6C63FF; }
   .header-left { display:flex; align-items:center; gap:10px; }
   #statusBar {
@@ -65,25 +68,26 @@
   #statusDot.local { background:#FF9800; }
   #statusDot.offline { background:#f44336; }
   .hamburger {
-    background:transparent; color:#E0E0E0; font-size:1.6rem;
-    padding:6px 10px; line-height:1; border-radius:8px;
-    min-height:auto;
+    background:transparent; color:#E0E0E0; font-size:1.7rem;
+    padding:6px 10px; line-height:1; border-radius:8px; min-height:auto;
   }
   .hamburger:hover { background:#2A2A2A; }
   .nav-dropdown {
     position:absolute; top:56px; right:12px;
     background:#1E1E1E; border:1px solid #333;
     border-radius:12px; padding:10px 0;
-    min-width:200px; box-shadow:0 8px 30px rgba(0,0,0,.7);
+    min-width:210px; box-shadow:0 8px 30px rgba(0,0,0,.7);
     display:none; flex-direction:column; z-index:200;
   }
   .nav-dropdown.open { display:flex; }
   .nav-dropdown a {
     padding:12px 20px; color:#D0D0D0; display:flex;
     align-items:center; gap:12px; font-size:0.95rem;
+    transition:.15s;
   }
   .nav-dropdown a:hover { background:#2A2A2A; color:#fff; }
   .nav-dropdown a i { width:20px; text-align:center; }
+  .nav-dropdown .divider { height:1px; background:#2A2A2A; margin:6px 0; }
   .header-right { position:relative; }
 
   main { flex:1; padding:20px 0 40px; }
@@ -94,13 +98,12 @@
   }
   footer i { color:#ff6b6b; }
 
-  /* Mobile */
-  @media (max-width:600px) {
+  @media (max-width:700px) {
     .grid-2 { grid-template-columns:1fr; }
-    .logo { font-size:1.1rem; }
+    .logo { font-size:1.15rem; }
     #statusBar { font-size:0.65rem; padding:3px 10px 3px 6px; }
     .card { padding:16px; }
-    button { padding:10px 14px; font-size:0.9rem; }
+    .nav-dropdown { right:8px; min-width:180px; }
   }
 </style>
 </head>
@@ -118,49 +121,145 @@
     <div class="header-right">
       <button class="hamburger" id="hamburgerBtn"><i class="fas fa-ellipsis-v"></i></button>
       <nav class="nav-dropdown" id="navDropdown">
-        <a href="https://fpshare.github.io"><i class="fas fa-home"></i> Code Share</a>
-        <a href="https://fpshare.github.io/lc"><i class="fas fa-code"></i> Live Coder</a>
-        <a href="#" id="logoutBtn" style="display:none;"><i class="fas fa-sign-out-alt"></i> Logout</a>
-        <a href="index.html#login" id="loginBtn2"><i class="fas fa-sign-in-alt"></i> Login</a>
+        <a href="#home" data-page="home"><i class="fas fa-home"></i> Home</a>
+        <a href="#search" data-page="search"><i class="fas fa-search"></i> Search</a>
+        <a href="#upload" data-page="upload" id="uploadNavLink"><i class="fas fa-upload"></i> Upload Code</a>
+        <a href="#account" data-page="account" id="accountNavLink"><i class="fas fa-user"></i> Account</a>
+        <a href="#admin" data-page="admin" id="adminNavLink" style="display:none;"><i class="fas fa-crown"></i> Admin</a>
+        <div class="divider"></div>
+        <a href="/lc"><i class="fas fa-code"></i> Live Coder</a>
+        <div class="divider"></div>
+        <a href="#login" id="loginNavLink"><i class="fas fa-sign-in-alt"></i> Login</a>
+        <a href="#register" id="registerNavLink"><i class="fas fa-user-plus"></i> Register</a>
+        <a href="#" id="logoutNavLink" style="display:none;"><i class="fas fa-sign-out-alt"></i> Logout</a>
       </nav>
     </div>
   </div>
 </header>
 
 <main class="container">
-  <h1 style="margin-bottom:6px;">Upload Code</h1>
-  <p class="text-muted" style="margin-bottom:20px;">Paste your code and upload it directly to Code Share.</p>
-
-  <div class="card">
-    <div id="userInfo" class="flex-between" style="padding-bottom:14px; border-bottom:1px solid #2A2A2A; margin-bottom:16px;">
-      <span class="text-muted"><i class="fas fa-user"></i> <span id="currentUserSpan">Not logged in</span></span>
-      <a href="index.html#login" id="loginLink2" style="font-size:0.9rem;">Login to Code Share →</a>
-    </div>
-
-    <input type="text" id="codeName" placeholder="Code Name *" autocomplete="off" />
+  <!-- HOME -->
+  <section id="page-home" class="page active">
+    <h1 style="margin-bottom:12px;">Welcome to FPShare</h1>
+    <p class="text-muted" style="margin-bottom:24px;">Discover, share, and manage code snippets across languages.</p>
     <div class="grid-2">
-      <select id="codeLanguage"><option value="">Select Language *</option></select>
-      <input type="text" id="codeTags" placeholder="Tags (comma separated)" />
+      <div class="card">
+        <h3><i class="fas fa-info-circle" style="color:#6C63FF;"></i> About</h3>
+        <p style="margin-top:8px;">FPShare is a community platform where developers upload and discover code snippets. Powered by JSONBin for cloud storage.</p>
+      </div>
+      <div class="card">
+        <h3><i class="fas fa-book"></i> Tutorial</h3>
+        <p style="margin-top:8px;">1. Register / Login<br>2. Upload code with language &amp; description<br>3. Browse, search, and review<br>4. Try the <a href="/lc">Live Coder</a> for on-the-fly coding.</p>
+      </div>
     </div>
-    <textarea id="codeDescription" placeholder="Description..." rows="3"></textarea>
-    <textarea id="codeContent" placeholder="Paste your code here *" rows="12" style="font-family:'Courier New', monospace;"></textarea>
-
-    <div class="flex" style="margin-top:6px;">
-      <button id="uploadBtn"><i class="fas fa-cloud-upload-alt"></i> Upload to Code Share</button>
-      <button id="clearBtn" style="background:#333; color:#CCC;"><i class="fas fa-eraser"></i> Clear</button>
+    <div class="card">
+      <h3><i class="fas fa-fire" style="color:#FF9800;"></i> Trending Code</h3>
+      <div id="trendingList" class="grid-3" style="margin-top:12px;">
+        <div class="text-muted">Loading trending...</div>
+      </div>
     </div>
-    <div id="uploadMessage" class="text-muted mt-2"></div>
-  </div>
+    <div class="card">
+      <h3><i class="fas fa-compass"></i> Navigation Guide</h3>
+      <p class="text-muted">Use the three-dot menu (⋮) to navigate. Upload, search, manage your account, try the Live Coder, and access admin panel (if admin).</p>
+    </div>
+  </section>
 
-  <div class="card">
-    <h3 style="margin-bottom:10px;"><i class="fas fa-info-circle" style="color:#6C63FF;"></i> How it works</h3>
-    <p class="text-muted" style="line-height:1.7;">
-      1. Login to Code Share first (click above).<br>
-      2. Fill in name, language, description.<br>
-      3. Paste your code.<br>
-      4. Click Upload — done!
-    </p>
-  </div>
+  <!-- SEARCH -->
+  <section id="page-search" class="page">
+    <h2>Search Code</h2>
+    <div class="card" style="margin-top:12px;">
+      <div class="grid-2">
+        <input type="text" id="searchInput" placeholder="Search by name, tags, description..." />
+        <select id="searchLanguage"><option value="">All Languages</option></select>
+      </div>
+      <div class="flex">
+        <button id="searchBtn"><i class="fas fa-search"></i> Search</button>
+        <button id="clearSearchBtn" style="background:transparent; color:#888;"><i class="fas fa-times"></i> Clear</button>
+      </div>
+    </div>
+    <div id="searchResults" class="grid-3"></div>
+  </section>
+
+  <!-- UPLOAD -->
+  <section id="page-upload" class="page">
+    <h2>Upload Code</h2>
+    <div class="card">
+      <input type="text" id="uploadName" placeholder="Code Name *" />
+      <select id="uploadLanguage"><option value="">Select Language *</option></select>
+      <textarea id="uploadDescription" placeholder="Description of your code..." rows="3"></textarea>
+      <input type="text" id="uploadTags" placeholder="Tags (comma separated: e.g. sorting, algorithm)" />
+      <textarea id="uploadContent" placeholder="Paste your code here *" rows="6"></textarea>
+      <button id="uploadSubmitBtn"><i class="fas fa-cloud-upload-alt"></i> Upload Code</button>
+      <div id="uploadMessage" class="text-muted mt-2"></div>
+    </div>
+  </section>
+
+  <!-- ACCOUNT -->
+  <section id="page-account" class="page">
+    <h2>My Account</h2>
+    <div class="card">
+      <p><strong>Username:</strong> <span id="accUsername">—</span></p>
+      <p><strong>Role:</strong> <span id="accRole">—</span></p>
+      <hr style="border-color:#2A2A2A; margin:16px 0;" />
+      <h4>Change Username</h4>
+      <div class="flex">
+        <input type="text" id="newUsername" placeholder="New username" style="flex:1;" />
+        <button id="changeUsernameBtn">Update</button>
+      </div>
+      <h4 style="margin-top:12px;">Change Password</h4>
+      <div class="flex">
+        <input type="password" id="newPassword" placeholder="New password" style="flex:1;" />
+        <button id="changePasswordBtn">Update</button>
+      </div>
+      <hr style="border-color:#2A2A2A; margin:16px 0;" />
+      <h4>My Uploads</h4>
+      <div id="myUploadsList"></div>
+      <hr style="border-color:#2A2A2A; margin:16px 0;" />
+      <button id="deleteAccountBtn" style="background:#d32f2f;"><i class="fas fa-trash"></i> Delete Account</button>
+    </div>
+  </section>
+
+  <!-- ADMIN -->
+  <section id="page-admin" class="page">
+    <h2>Admin Panel</h2>
+    <div class="card">
+      <h3><i class="fas fa-users-cog"></i> Account Management</h3>
+      <div id="adminAccountList" class="mt-2"></div>
+      <hr style="border-color:#2A2A2A; margin:16px 0;" />
+      <h4>Create Admin Account</h4>
+      <div class="flex">
+        <input type="text" id="adminNewUser" placeholder="Username" style="flex:1;" />
+        <input type="password" id="adminNewPass" placeholder="Password" style="flex:1;" />
+        <button id="createAdminBtn"><i class="fas fa-user-cog"></i> Create Admin</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3><i class="fas fa-code"></i> Code Management</h3>
+      <div id="adminCodeList" class="mt-2"></div>
+    </div>
+  </section>
+
+  <!-- LOGIN -->
+  <section id="page-login" class="page">
+    <div class="card" style="max-width:400px; margin:0 auto;">
+      <h2>Login</h2>
+      <input type="text" id="loginUsername" placeholder="Username" />
+      <input type="password" id="loginPassword" placeholder="Password" />
+      <button id="loginBtn"><i class="fas fa-sign-in-alt"></i> Login</button>
+      <div id="loginMessage" class="text-muted mt-2"></div>
+    </div>
+  </section>
+
+  <!-- REGISTER -->
+  <section id="page-register" class="page">
+    <div class="card" style="max-width:400px; margin:0 auto;">
+      <h2>Register</h2>
+      <input type="text" id="regUsername" placeholder="Username *" />
+      <input type="password" id="regPassword" placeholder="Password *" />
+      <button id="registerBtn"><i class="fas fa-user-plus"></i> Register</button>
+      <div id="registerMessage" class="text-muted mt-2"></div>
+    </div>
+  </section>
 </main>
 
 <footer>
@@ -174,10 +273,13 @@ const CONFIG = {
   accessKey: '$2a$10$JA6QOUKOY5qL0x2h5Q3U2eHJ6BHP1bO9lEC/LZyWhbH11pyhezdOy',
   binId: '6aa218e1ffd5d16053f4561d',
   baseUrl: 'https://api.jsonbin.io/v3/b',
+  adminUser: 'FirePlayzYT0',
+  adminPass: 'FireIsNear69',
   languages: ['HTML','CSS','JavaScript','TypeScript','Python','Java','C','C+','C++','C#','Ruby','Go','Rust','PHP','Swift','Kotlin','SQL','Bash','Other']
 };
 
 const $ = id => document.getElementById(id);
+const $$ = sel => document.querySelectorAll(sel);
 let db = { users: [], codes: [] };
 let currentUser = null;
 
@@ -196,20 +298,37 @@ async function fetchDB() {
     const res = await fetch(`${CONFIG.baseUrl}/${CONFIG.binId}/latest`, {
       headers: { 'X-Master-Key': CONFIG.masterKey, 'X-Access-Key': CONFIG.accessKey }
     });
-    if (!res.ok) throw new Error('api');
+    if (!res.ok) throw new Error('API error');
     const data = await res.json();
-    const rec = data.record || {};
-    db.users = rec.users || [];
-    db.codes = rec.codes || [];
+    const record = data.record || { users: [], codes: [] };
+    if (!record.users) record.users = [];
+    if (!record.codes) record.codes = [];
+    db = record;
+    const adminExists = db.users.some(u => u.username === CONFIG.adminUser);
+    if (!adminExists) {
+      db.users.push({
+        username: CONFIG.adminUser, password: CONFIG.adminPass,
+        role: 'admin', permissions: ['manage_codes','manage_accounts','create_admins'],
+        createdAt: new Date().toISOString()
+      });
+      await saveDB();
+    }
     setStatus('cloud','Cloud');
-  } catch(e) {
+    return db;
+  } catch (e) {
     setStatus('local','Local (cached)');
     const cached = localStorage.getItem('fpshare_db');
     if (cached) { try { db = JSON.parse(cached); } catch(_){} }
+    if (!db.users.length) {
+      db.users = [{
+        username: CONFIG.adminUser, password: CONFIG.adminPass,
+        role: 'admin', permissions: ['manage_codes','manage_accounts','create_admins'],
+        createdAt: new Date().toISOString()
+      }];
+    }
+    return db;
   }
-  localStorage.setItem('fpshare_db', JSON.stringify(db));
 }
-
 async function saveDB() {
   try {
     const res = await fetch(`${CONFIG.baseUrl}/${CONFIG.binId}`, {
@@ -221,85 +340,302 @@ async function saveDB() {
       },
       body: JSON.stringify(db)
     });
-    if (!res.ok) throw new Error('save');
+    if (!res.ok) throw new Error('Save failed');
     setStatus('cloud','Cloud');
     localStorage.setItem('fpshare_db', JSON.stringify(db));
     return true;
-  } catch(e) {
-    setStatus('local','Local');
+  } catch (e) {
+    setStatus('local','Local (save failed)');
     localStorage.setItem('fpshare_db', JSON.stringify(db));
     return false;
   }
 }
 
-// ===== UI =====
-function updateUI() {
-  const logged = !!currentUser;
-  $('currentUserSpan').textContent = logged ? currentUser.username : 'Not logged in';
-  $('loginLink2').style.display = logged ? 'none' : 'inline';
-  $('loginBtn2').style.display = logged ? 'none' : 'flex';
-  $('logoutBtn').style.display = logged ? 'flex' : 'none';
-  $('uploadBtn').disabled = !logged;
-  $('uploadBtn').style.opacity = logged ? '1' : '0.5';
+// ===== AUTH =====
+function login(username, password) {
+  const user = db.users.find(u => u.username === username && u.password === password);
+  if (user) {
+    currentUser = user;
+    localStorage.setItem('codeshare_user', JSON.stringify(user));
+    updateUI();
+    return true;
+  }
+  return false;
+}
+function logout() {
+  currentUser = null;
+  localStorage.removeItem('codeshare_user');
+  updateUI();
+  window.location.hash = '#home';
+}
+function register(username, password) {
+  if (db.users.find(u => u.username === username)) return false;
+  db.users.push({
+    username, password, role: 'user', permissions: [],
+    createdAt: new Date().toISOString()
+  });
+  saveDB();
+  return true;
+}
+function isAdmin() { return currentUser && currentUser.role === 'admin'; }
+
+// ===== NAVIGATION (HASH) =====
+function navigate(page) {
+  $$('.page').forEach(p => p.classList.remove('active'));
+  const target = $(`page-${page}`);
+  if (target) target.classList.add('active');
+  $('navDropdown').classList.remove('open');
+  window.location.hash = '#' + page;
+  updateUI();
 }
 
-// ===== AUTH from localStorage (shared with Code Share) =====
-function loadSession() {
-  const s = localStorage.getItem('codeshare_user');
-  if (s) { try { currentUser = JSON.parse(s); } catch(_){} }
+// ===== UI UPDATE =====
+function updateUI() {
+  const loggedIn = !!currentUser;
+  $('uploadNavLink').style.display = loggedIn ? 'flex' : 'none';
+  $('accountNavLink').style.display = loggedIn ? 'flex' : 'none';
+  $('loginNavLink').style.display = loggedIn ? 'none' : 'flex';
+  $('registerNavLink').style.display = loggedIn ? 'none' : 'flex';
+  $('logoutNavLink').style.display = loggedIn ? 'flex' : 'none';
+  $('adminNavLink').style.display = isAdmin() ? 'flex' : 'none';
+
+  if (!loggedIn) {
+    const active = document.querySelector('.page.active');
+    if (active && (active.id === 'page-upload' || active.id === 'page-account')) {
+      navigate('home');
+    }
+  }
+  if (loggedIn && $('page-account').classList.contains('active')) renderAccount();
+  if (isAdmin() && $('page-admin').classList.contains('active')) renderAdmin();
+}
+
+// ===== RENDER =====
+function renderAccount() {
+  if (!currentUser) return;
+  $('accUsername').textContent = currentUser.username;
+  $('accRole').textContent = currentUser.role || 'user';
+  const myCodes = db.codes.filter(c => c.uploader === currentUser.username);
+  const container = $('myUploadsList');
+  if (!myCodes.length) { container.innerHTML = '<p class="text-muted">No uploads yet.</p>'; return; }
+  container.innerHTML = myCodes.map(c => `
+    <div class="flex-between" style="border-bottom:1px solid #2A2A2A; padding:8px 0;">
+      <span><strong>${c.name}</strong> (${c.language})</span>
+      <button class="delete-code-btn" data-id="${c.code_id}" style="background:#d32f2f; padding:4px 12px; min-height:auto;">Delete</button>
+    </div>
+  `).join('');
+  container.querySelectorAll('.delete-code-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (confirm('Delete this code?')) {
+        db.codes = db.codes.filter(c => c.code_id !== btn.dataset.id);
+        await saveDB();
+        renderAccount();
+        renderTrending();
+      }
+    });
+  });
+}
+
+function renderTrending() {
+  const container = $('trendingList');
+  const sorted = [...db.codes].sort((a,b) => (b.views||0) - (a.views||0));
+  const top = sorted.slice(0, 6);
+  if (!top.length) { container.innerHTML = '<div class="text-muted">No code uploaded yet.</div>'; return; }
+  container.innerHTML = top.map(c => `
+    <div class="card" style="cursor:pointer;" onclick="viewCode('${c.code_id}')">
+      <h4>${c.name}</h4>
+      <div><span class="badge">${c.language}</span></div>
+      <div class="text-muted" style="font-size:0.8rem;">👁️ ${c.views || 0} ⭐ ${(c.reviews||[]).length}</div>
+    </div>
+  `).join('');
+}
+
+window.viewCode = function(id) {
+  const code = db.codes.find(c => c.code_id === id);
+  if (!code) return alert('Code not found');
+  code.views = (code.views || 0) + 1;
+  saveDB();
+  const reviewsHtml = (code.reviews || []).map(r => `
+    <div class="review-item">
+      <strong>${r.username}</strong>
+      <span class="star">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</span>
+      <p>${r.comment}</p>
+      <span class="text-muted" style="font-size:0.7rem;">${new Date(r.timestamp).toLocaleDateString()}</span>
+    </div>
+  `).join('');
+  const html = `
+    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this) this.remove()">
+      <div class="card" style="max-width:700px; width:100%; max-height:90vh; overflow-y:auto; background:#1A1A1A;">
+        <div class="flex-between"><h2>${code.name}</h2><button onclick="this.closest('div[style]').remove()">✕</button></div>
+        <p><span class="badge">${code.language}</span> <span class="badge">👁️ ${code.views}</span></p>
+        <p><strong>Uploader:</strong> ${code.uploader} (${code.uploaderType||'user'})</p>
+        <p><strong>Description:</strong> ${code.description || 'No description'}</p>
+        <p><strong>Tags:</strong> ${(code.tags||[]).join(', ') || 'None'}</p>
+        <pre style="background:#0D0D0D; padding:16px; border-radius:10px; font-family:'Courier New', monospace; font-size:0.9rem; white-space:pre-wrap; word-wrap:break-word; max-height:300px; overflow-y:auto; border:1px solid #2A2A2A;">${code.content}</pre>
+        <hr style="border-color:#333; margin:12px 0;" />
+        <h4>Reviews</h4>
+        ${reviewsHtml || '<p class="text-muted">No reviews yet.</p>'}
+        ${currentUser ? `
+          <div style="margin-top:12px;">
+            <select id="reviewRating"><option value="5">★★★★★</option><option value="4">★★★★☆</option><option value="3">★★★☆☆</option><option value="2">★★☆☆☆</option><option value="1">★☆☆☆☆</option></select>
+            <textarea id="reviewComment" placeholder="Your review..." rows="2"></textarea>
+            <button onclick="submitReview('${code.code_id}')">Post Review</button>
+          </div>
+        ` : '<p class="text-muted">Login to post a review.</p>'}
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', html);
+};
+
+window.submitReview = async function(codeId) {
+  const rating = parseInt(document.getElementById('reviewRating').value);
+  const comment = document.getElementById('reviewComment').value.trim();
+  if (!comment) return alert('Please write a comment.');
+  const code = db.codes.find(c => c.code_id === codeId);
+  if (!code) return alert('Code not found');
+  if (!code.reviews) code.reviews = [];
+  code.reviews.push({
+    username: currentUser.username, rating, comment,
+    timestamp: new Date().toISOString()
+  });
+  await saveDB();
+  alert('Review posted!');
+  document.querySelector('div[style*="fixed"]')?.remove();
+  viewCode(codeId);
+};
+
+// ===== SEARCH =====
+function performSearch() {
+  const q = $('searchInput').value.toLowerCase();
+  const lang = $('searchLanguage').value;
+  const results = db.codes.filter(c => {
+    let match = true;
+    if (q && !c.name.toLowerCase().includes(q)
+      && !(c.tags||[]).some(t => t.toLowerCase().includes(q))
+      && !(c.description||'').toLowerCase().includes(q)) match = false;
+    if (lang && c.language !== lang) match = false;
+    return match;
+  });
+  const container = $('searchResults');
+  if (!results.length) { container.innerHTML = '<p class="text-muted">No results found.</p>'; return; }
+  container.innerHTML = results.map(c => `
+    <div class="card" style="cursor:pointer;" onclick="viewCode('${c.code_id}')">
+      <h4>${c.name}</h4>
+      <div><span class="badge">${c.language}</span></div>
+      <div class="text-muted" style="font-size:0.8rem;">👁️ ${c.views||0} ⭐ ${(c.reviews||[]).length}</div>
+    </div>
+  `).join('');
+}
+
+// ===== ADMIN =====
+function renderAdmin() {
+  if (!isAdmin()) return;
+  const accContainer = $('adminAccountList');
+  accContainer.innerHTML = db.users.map(u => `
+    <div class="flex-between" style="border-bottom:1px solid #2A2A2A; padding:6px 0;">
+      <span><strong>${u.username}</strong> (${u.role}) ${u.username === CONFIG.adminUser ? '⭐' : ''}</span>
+      ${u.username !== CONFIG.adminUser ? `<button class="admin-delete-user" data-user="${u.username}" style="background:#d32f2f; padding:2px 12px; min-height:auto;">Delete</button>` : ''}
+    </div>
+  `).join('');
+  accContainer.querySelectorAll('.admin-delete-user').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (confirm(`Delete user ${btn.dataset.user}?`)) {
+        db.users = db.users.filter(u => u.username !== btn.dataset.user);
+        await saveDB();
+        renderAdmin();
+      }
+    });
+  });
+  const codeContainer = $('adminCodeList');
+  codeContainer.innerHTML = db.codes.map(c => `
+    <div class="flex-between" style="border-bottom:1px solid #2A2A2A; padding:8px 0;">
+      <span><strong>${c.name}</strong> (${c.language}) by ${c.uploader}</span>
+      <div>
+        <button class="admin-edit-code" data-id="${c.code_id}" style="background:#1976d2; padding:2px 12px; min-height:auto;">Edit</button>
+        <button class="admin-delete-code" data-id="${c.code_id}" style="background:#d32f2f; padding:2px 12px; min-height:auto;">Delete</button>
+      </div>
+    </div>
+  `).join('');
+  codeContainer.querySelectorAll('.admin-delete-code').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (confirm('Delete this code?')) {
+        db.codes = db.codes.filter(c => c.code_id !== btn.dataset.id);
+        await saveDB();
+        renderAdmin();
+        renderTrending();
+      }
+    });
+  });
+  codeContainer.querySelectorAll('.admin-edit-code').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const code = db.codes.find(c => c.code_id === btn.dataset.id);
+      if (!code) return;
+      const newName = prompt('New name:', code.name);
+      if (newName) code.name = newName;
+      const newContent = prompt('New content:', code.content);
+      if (newContent) code.content = newContent;
+      const newDesc = prompt('New description:', code.description || '');
+      if (newDesc !== null) code.description = newDesc;
+      await saveDB();
+      renderAdmin();
+      renderTrending();
+    });
+  });
 }
 
 // ===== UPLOAD =====
-async function upload() {
-  if (!currentUser) { $('uploadMessage').textContent = '⚠️ Please login to Code Share first.'; return; }
-  const name = $('codeName').value.trim();
-  const language = $('codeLanguage').value;
-  const tags = $('codeTags').value.split(',').map(s=>s.trim()).filter(Boolean);
-  const description = $('codeDescription').value.trim();
-  const content = $('codeContent').value.trim();
-
+async function handleUpload() {
+  if (!currentUser) return alert('Please login to upload.');
+  const name = $('uploadName').value.trim();
+  const language = $('uploadLanguage').value;
+  const description = $('uploadDescription').value.trim();
+  const tags = $('uploadTags').value.split(',').map(s => s.trim()).filter(Boolean);
+  const content = $('uploadContent').value.trim();
   if (!name || !language || !content) {
-    $('uploadMessage').textContent = '⚠️ Name, Language and Content are required.';
+    $('uploadMessage').textContent = 'Name, Language, and Content are required.';
     return;
   }
-
-  $('uploadMessage').textContent = '⏳ Uploading...';
-  await fetchDB();
-
-  const newCode = {
-    code_id: 'code_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
+  db.codes.push({
+    code_id: 'code_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
     name, uploader: currentUser.username,
     uploaderType: currentUser.role === 'admin' ? 'admin' : 'user',
     description, language, tags,
     timestamp: new Date().toISOString(),
     content, views: 0, reviews: []
-  };
-  db.codes.push(newCode);
-  const ok = await saveDB();
-  if (ok) {
-    $('uploadMessage').textContent = '✅ Uploaded successfully!';
-    $('codeName').value = '';
-    $('codeTags').value = '';
-    $('codeDescription').value = '';
-    $('codeContent').value = '';
-  } else {
-    $('uploadMessage').textContent = '⚠️ Saved locally (API slow). Will sync later.';
-  }
+  });
+  await saveDB();
+  $('uploadMessage').textContent = '✅ Code uploaded successfully!';
+  $('uploadName').value = '';
+  $('uploadDescription').value = '';
+  $('uploadTags').value = '';
+  $('uploadContent').value = '';
+  renderTrending();
 }
 
 // ===== INIT =====
 async function init() {
-  // Language options
-  const sel = $('codeLanguage');
-  CONFIG.languages.forEach(l => {
-    const o = document.createElement('option');
-    o.value = o.textContent = l;
-    sel.appendChild(o);
+  // Populate languages
+  ['uploadLanguage','searchLanguage'].forEach(id => {
+    const sel = $(id);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Select Language</option>';
+    CONFIG.languages.forEach(l => {
+      sel.innerHTML += `<option value="${l}">${l}</option>`;
+    });
   });
 
-  loadSession();
   await fetchDB();
+
+  // Load session
+  const s = localStorage.getItem('codeshare_user');
+  if (s) { try { currentUser = JSON.parse(s); } catch(_){} }
+
   updateUI();
+  renderTrending();
+
+  // Route from hash
+  const hash = window.location.hash.replace('#','') || 'home';
+  if ($('page-' + hash)) navigate(hash); else navigate('home');
 
   // Hamburger
   $('hamburgerBtn').addEventListener('click', e => {
@@ -308,24 +644,131 @@ async function init() {
   });
   document.addEventListener('click', () => $('navDropdown').classList.remove('open'));
 
-  // Logout
-  $('logoutBtn').addEventListener('click', e => {
-    e.preventDefault();
-    currentUser = null;
-    localStorage.removeItem('codeshare_user');
-    updateUI();
-    $('uploadMessage').textContent = 'Logged out.';
+  // Hash navigation
+  window.addEventListener('hashchange', () => {
+    const p = window.location.hash.replace('#','') || 'home';
+    if ($('page-' + p)) {
+      $$('.page').forEach(x => x.classList.remove('active'));
+      $('page-' + p).classList.add('active');
+      updateUI();
+    }
   });
 
-  // Buttons
-  $('uploadBtn').addEventListener('click', upload);
-  $('clearBtn').addEventListener('click', () => {
-    $('codeName').value = '';
-    $('codeTags').value = '';
-    $('codeDescription').value = '';
-    $('codeContent').value = '';
-    $('uploadMessage').textContent = '';
+  // Nav links
+  document.querySelectorAll('[data-page]').forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      navigate(link.dataset.page);
+    });
   });
+
+  // Login / Register links
+  $('loginNavLink').addEventListener('click', e => { e.preventDefault();
+    navigate('login'); });
+  $('registerNavLink').addEventListener('click', e => { e.preventDefault();
+    navigate('register'); });
+  $('logoutNavLink').addEventListener('click', e => { e.preventDefault();
+    logout(); });
+
+  // Login
+  $('loginBtn').addEventListener('click', () => {
+    const u = $('loginUsername').value.trim();
+    const p = $('loginPassword').value.trim();
+    if (login(u, p)) {
+      $('loginMessage').textContent = '✅ Login successful!';
+      navigate('home');
+    } else {
+      $('loginMessage').textContent = '❌ Invalid credentials.';
+    }
+  });
+
+  // Register
+  $('registerBtn').addEventListener('click', () => {
+    const u = $('regUsername').value.trim();
+    const p = $('regPassword').value.trim();
+    if (!u || !p) { $('registerMessage').textContent = 'Username and password required.'; return; }
+    if (register(u, p)) {
+      $('registerMessage').textContent = '✅ Registered! Please login.';
+      navigate('login');
+    } else {
+      $('registerMessage').textContent = '❌ Username already exists.';
+    }
+  });
+
+  // Search
+  $('searchBtn').addEventListener('click', performSearch);
+  $('clearSearchBtn').addEventListener('click', () => {
+    $('searchInput').value = '';
+    $('searchLanguage').value = '';
+    $('searchResults').innerHTML = '';
+  });
+  $('searchInput').addEventListener('keyup', e => { if (e.key === 'Enter') performSearch(); });
+
+  // Upload
+  $('uploadSubmitBtn').addEventListener('click', handleUpload);
+
+  // Account
+  $('changeUsernameBtn').addEventListener('click', async () => {
+    const newU = $('newUsername').value.trim();
+    if (!newU) return alert('Enter new username.');
+    if (db.users.find(u => u.username === newU)) return alert('Username taken.');
+    const old = currentUser.username;
+    const user = db.users.find(u => u.username === old);
+    if (user) user.username = newU;
+    db.codes.forEach(c => { if (c.uploader === old) c.uploader = newU; });
+    db.codes.forEach(c => (c.reviews||[]).forEach(r => { if (r.username === old) r.username = newU; }));
+    currentUser.username = newU;
+    localStorage.setItem('codeshare_user', JSON.stringify(currentUser));
+    await saveDB();
+    updateUI();
+    renderAccount();
+    renderTrending();
+    alert('Username updated.');
+  });
+  $('changePasswordBtn').addEventListener('click', async () => {
+    const newP = $('newPassword').value.trim();
+    if (!newP) return alert('Enter new password.');
+    const user = db.users.find(u => u.username === currentUser.username);
+    if (user) user.password = newP;
+    currentUser.password = newP;
+    localStorage.setItem('codeshare_user', JSON.stringify(currentUser));
+    await saveDB();
+    alert('Password updated.');
+  });
+  $('deleteAccountBtn').addEventListener('click', async () => {
+    if (!confirm('Permanently delete your account and all your uploads?')) return;
+    const username = currentUser.username;
+    db.users = db.users.filter(u => u.username !== username);
+    db.codes = db.codes.filter(c => c.uploader !== username);
+    db.codes.forEach(c => { c.reviews = (c.reviews||[]).filter(r => r.username !== username); });
+    await saveDB();
+    logout();
+    alert('Account deleted.');
+  });
+
+  // Admin: create admin
+  $('createAdminBtn').addEventListener('click', async () => {
+    if (!isAdmin()) return alert('Admin only.');
+    const u = $('adminNewUser').value.trim();
+    const p = $('adminNewPass').value.trim();
+    if (!u || !p) return alert('Username and password required.');
+    if (db.users.find(uu => uu.username === u)) return alert('Username exists.');
+    db.users.push({
+      username: u, password: p, role: 'admin',
+      permissions: ['manage_codes','manage_accounts','create_admins'],
+      createdAt: new Date().toISOString()
+    });
+    await saveDB();
+    $('adminNewUser').value = '';
+    $('adminNewPass').value = '';
+    renderAdmin();
+    alert('Admin created.');
+  });
+
+  // Admin render on nav
+  $('adminNavLink').addEventListener('click', () => { if (isAdmin()) renderAdmin(); });
+
+  console.log('FPShare ready.');
 }
 init();
 </script>
