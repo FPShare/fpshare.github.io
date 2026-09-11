@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-<title>Live Coder — FPShare</title>
+<title>FPShare</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -174,7 +174,7 @@
     <select id="languageSelect"></select>
     <input type="text" id="fileName" placeholder="File name" value="untitled" style="min-width:140px;" />
     <button id="runBtn" class="success"><i class="fas fa-play"></i> Run</button>
-    <button id="uploadBtn" class="ghost"><i class="fas fa-cloud-upload-alt"></i> Upload to Code Share</button>
+    <button id="uploadBtn" class="ghost"><i class="fas fa-cloud-upload-alt"></i> Upload to FPShare</button>
     <button id="clearBtn" class="ghost"><i class="fas fa-eraser"></i> Clear</button>
   </div>
 
@@ -214,37 +214,44 @@
 <script>
 // ===== CONFIG =====
 const CONFIG = {
+  // FPShare main bin (users + codes)
   masterKey: '$2a$10$V6E8iLbl6jIkCLCbwaGj4uoQubBS0uhB2sBWm.t8xafNFSNlqWYO6',
   accessKey: '$2a$10$JA6QOUKOY5qL0x2h5Q3U2eHJ6BHP1bO9lEC/LZyWhbH11pyhezdOy',
   binId: '6aa218e1ffd5d16053f4561d',
+
+  // Secret bin holding the Groq AI key
+  secretBinId: '6aa35af7ac6210605abed068',
+
   baseUrl: 'https://api.jsonbin.io/v3/b',
-  groqKey: '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',
+  groqUrl: 'https://api.groq.com/openai/v1/chat/completions',
   groqModel: 'llama-3.3-70b-versatile',
   pistonUrl: 'https://emkc.org/api/v2/piston/execute',
+
   languages: {
-    'HTML':       { type:'web',  piston:null,        ext:'html' },
-    'CSS':        { type:'web',  piston:null,        ext:'css' },
-    'JavaScript': { type:'web',  piston:'javascript',ext:'js' },
+    'HTML':       { type:'web',    piston:null,         ext:'html' },
+    'CSS':        { type:'web',    piston:null,         ext:'css' },
+    'JavaScript': { type:'web',    piston:'javascript', ext:'js' },
     'TypeScript': { type:'piston', piston:'typescript', ext:'ts' },
-    'Python':     { type:'piston', piston:'python',  ext:'py' },
-    'Java':       { type:'piston', piston:'java',    ext:'java' },
-    'C':          { type:'piston', piston:'c',       ext:'c' },
-    'C++':        { type:'piston', piston:'c++',     ext:'cpp' },
-    'C#':         { type:'piston', piston:'csharp',  ext:'cs' },
-    'Ruby':       { type:'piston', piston:'ruby',    ext:'rb' },
-    'Go':         { type:'piston', piston:'go',      ext:'go' },
-    'Rust':       { type:'piston', piston:'rust',    ext:'rs' },
-    'PHP':        { type:'piston', piston:'php',     ext:'php' },
-    'Swift':      { type:'piston', piston:'swift',   ext:'swift' },
-    'Kotlin':     { type:'piston', piston:'kotlin',  ext:'kt' },
-    'SQL':        { type:'piston', piston:'sqlite3', ext:'sql' },
-    'Bash':       { type:'piston', piston:'bash',    ext:'sh' }
+    'Python':     { type:'piston', piston:'python',     ext:'py' },
+    'Java':       { type:'piston', piston:'java',       ext:'java' },
+    'C':          { type:'piston', piston:'c',          ext:'c' },
+    'C++':        { type:'piston', piston:'c++',        ext:'cpp' },
+    'C#':         { type:'piston', piston:'csharp',     ext:'cs' },
+    'Ruby':       { type:'piston', piston:'ruby',       ext:'rb' },
+    'Go':         { type:'piston', piston:'go',         ext:'go' },
+    'Rust':       { type:'piston', piston:'rust',       ext:'rs' },
+    'PHP':        { type:'piston', piston:'php',        ext:'php' },
+    'Swift':      { type:'piston', piston:'swift',      ext:'swift' },
+    'Kotlin':     { type:'piston', piston:'kotlin',     ext:'kt' },
+    'SQL':        { type:'piston', piston:'sqlite3',    ext:'sql' },
+    'Bash':       { type:'piston', piston:'bash',       ext:'sh' }
   }
 };
 
 const $ = id => document.getElementById(id);
 const editor = $('codeEditor');
 let currentUser = null;
+let groqKey = null; // fetched at runtime from secret bin
 
 // ===== STATUS =====
 function setStatus(mode, msg) {
@@ -255,7 +262,44 @@ function setStatus(mode, msg) {
   else { dot.classList.add('offline'); text.textContent = msg||'Offline'; }
 }
 
-// ===== DB HELPERS =====
+// ===== FETCH GROQ KEY FROM SECRET BIN =====
+async function loadGroqKey(forceRefresh = false) {
+  // Check cache first (24h), unless forceRefresh
+  if (!forceRefresh) {
+    const cached = localStorage.getItem('groq_key_cache');
+    if (cached) {
+      try {
+        const obj = JSON.parse(cached);
+        if (obj.key && (Date.now() - obj.ts) < 86400000) {
+          groqKey = obj.key;
+          return groqKey;
+        }
+      } catch(_){}
+    }
+  }
+
+  try {
+    const res = await fetch(`${CONFIG.baseUrl}/${CONFIG.secretBinId}/latest`, {
+      headers: {
+        'X-Master-Key': CONFIG.masterKey,
+        'X-Access-Key': CONFIG.accessKey
+      }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const key = data.record?.ai?.[0]?.api;
+    if (!key) throw new Error('No AI key in secret bin');
+    groqKey = key;
+    localStorage.setItem('groq_key_cache', JSON.stringify({ key, ts: Date.now() }));
+    console.log('✅ Groq key loaded from secret bin');
+    return key;
+  } catch (e) {
+    console.warn('❌ Groq key fetch failed:', e);
+    return null;
+  }
+}
+
+// ===== DB HELPERS (FPShare bin) =====
 async function fetchDB() {
   try {
     const res = await fetch(`${CONFIG.baseUrl}/${CONFIG.binId}/latest`, {
@@ -395,9 +439,10 @@ async function run() {
 }
 
 // ===== UPLOAD =====
-async function uploadToCodeShare() {
+async function uploadToFPShare() {
   if (!currentUser) {
     alert('Please login at FPShare first, then come back.');
+    window.location.href = '/';
     return;
   }
   const name = $('fileName').value.trim() || 'Untitled';
@@ -428,6 +473,17 @@ async function askAI() {
   if (!prompt) return;
   const out = $('aiOutput');
   out.style.display = 'block';
+
+  // Lazy-load Groq key on first AI request
+  if (!groqKey) {
+    out.textContent = '🔑 Loading AI key...';
+    await loadGroqKey();
+  }
+  if (!groqKey) {
+    out.textContent = '❌ Could not load AI key. Try again later.';
+    return;
+  }
+
   out.textContent = '🤔 Thinking...';
 
   const sys = `You are an expert coding assistant inside a live code editor. The user's current code is written in ${$('languageSelect').value}:
@@ -439,11 +495,11 @@ ${editor.value}
 Answer concisely, helpfully, with code examples when relevant.`;
 
   try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const res = await fetch(CONFIG.groqUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + CONFIG.groqKey
+        'Authorization': 'Bearer ' + groqKey
       },
       body: JSON.stringify({
         model: CONFIG.groqModel,
@@ -455,6 +511,39 @@ Answer concisely, helpfully, with code examples when relevant.`;
         max_tokens: 1200
       })
     });
+
+    // If key rejected, clear cache and retry once
+    if (res.status === 401) {
+      console.warn('⚠️ Groq key rejected. Refreshing from secret bin...');
+      localStorage.removeItem('groq_key_cache');
+      groqKey = null;
+      await loadGroqKey(true);
+      if (groqKey) {
+        const res2 = await fetch(CONFIG.groqUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + groqKey
+          },
+          body: JSON.stringify({
+            model: CONFIG.groqModel,
+            messages: [
+              { role: 'system', content: sys },
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.5,
+            max_tokens: 1200
+          })
+        });
+        if (!res2.ok) throw new Error('HTTP ' + res2.status);
+        const data2 = await res2.json();
+        out.textContent = data2.choices?.[0]?.message?.content || 'No response.';
+        return;
+      } else {
+        throw new Error('AI key invalid. Update secret bin.');
+      }
+    }
+
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     out.textContent = data.choices?.[0]?.message?.content || 'No response.';
@@ -495,6 +584,12 @@ function init() {
   setStatus('cloud','Cloud');
   setupMobileTabs();
 
+  // Pre-fetch AI key in background
+  loadGroqKey().then(k => {
+    if (k) console.log('🔑 AI ready');
+    else console.warn('⚠️ AI key unavailable');
+  });
+
   $('hamburgerBtn').addEventListener('click', e => {
     e.stopPropagation();
     $('navDropdown').classList.toggle('open');
@@ -502,7 +597,7 @@ function init() {
   document.addEventListener('click', () => $('navDropdown').classList.remove('open'));
 
   $('runBtn').addEventListener('click', run);
-  $('uploadBtn').addEventListener('click', uploadToCodeShare);
+  $('uploadBtn').addEventListener('click', uploadToFPShare);
   $('clearBtn').addEventListener('click', () => {
     if (confirm('Clear editor?')) editor.value = '';
   });
