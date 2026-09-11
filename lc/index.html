@@ -109,6 +109,7 @@
   #terminal .ok { color:#4CAF50; }
   #terminal .info { color:#6C63FF; }
   #terminal .dim { color:#888; }
+  #terminal .warn { color:#FF9800; }
 
   .ai-panel {
     background:#161616; border-top:1px solid #2A2A2A;
@@ -214,48 +215,40 @@
 <script>
 // ===== CONFIG =====
 const CONFIG = {
-  // FPShare main bin (users + codes)
   masterKey: '$2a$10$V6E8iLbl6jIkCLCbwaGj4uoQubBS0uhB2sBWm.t8xafNFSNlqWYO6',
   accessKey: '$2a$10$JA6QOUKOY5qL0x2h5Q3U2eHJ6BHP1bO9lEC/LZyWhbH11pyhezdOy',
   binId: '6aa218e1ffd5d16053f4561d',
-
-  // Secret bin holding the Groq AI key
   secretBinId: '6aa35af7ac6210605abed068',
-
   baseUrl: 'https://api.jsonbin.io/v3/b',
   groqUrl: 'https://api.groq.com/openai/v1/chat/completions',
   groqModel: 'llama-3.3-70b-versatile',
 
-  // ==== Code execution ====
   wandboxUrl: 'https://wandbox.org/api/compile.json',
   corsProxies: [
     'https://corsproxy.io/?url=',
-    'https://api.allorigins.win/raw?url='
+    'https://api.allorigins.win/raw?url=',
+    'https://cors.eu.org/'
   ],
   pistonUrl: 'https://emkc.org/api/v2/piston/execute',
 
-  // Language config
-  // wandbox: compiler id from wandbox.org
-  // piston:  language id for piston fallback
-  // type: 'web' = iframe preview | 'piston' = terminal via wandbox/piston
   languages: {
-    'HTML':       { type:'web',    wandbox:null,                piston:null,         ext:'html' },
-    'CSS':        { type:'web',    wandbox:null,                piston:null,         ext:'css' },
-    'JavaScript': { type:'web',    wandbox:'nodejs-20.10.0',    piston:'javascript', ext:'js' },
-    'TypeScript': { type:'piston', wandbox:'typescript-5.3.3',  piston:'typescript', ext:'ts' },
-    'Python':     { type:'piston', wandbox:'cpython-3.12.0',    piston:'python',     ext:'py' },
-    'Java':       { type:'piston', wandbox:'openjdk-jdk-21+35', piston:'java',       ext:'java' },
-    'C':          { type:'piston', wandbox:'gcc-13.2.0-c',      piston:'c',          ext:'c' },
-    'C++':        { type:'piston', wandbox:'gcc-13.2.0',        piston:'c++',        ext:'cpp' },
-    'C#':         { type:'piston', wandbox:'mono-6.12.0.199',   piston:'csharp',     ext:'cs' },
-    'Ruby':       { type:'piston', wandbox:'ruby-3.3.0',        piston:'ruby',       ext:'rb' },
-    'Go':         { type:'piston', wandbox:'go-1.22.0',         piston:'go',         ext:'go' },
-    'Rust':       { type:'piston', wandbox:'rustc-1.76.0',      piston:'rust',       ext:'rs' },
-    'PHP':        { type:'piston', wandbox:'php-8.3.2',         piston:'php',        ext:'php' },
-    'Swift':      { type:'piston', wandbox:'swift-5.9.2',       piston:'swift',      ext:'swift' },
-    'Kotlin':     { type:'piston', wandbox:'kotlin-1.9.22',     piston:'kotlin',     ext:'kt' },
-    'SQL':        { type:'piston', wandbox:'sqlite-3.45.0',     piston:'sqlite3',    ext:'sql' },
-    'Bash':       { type:'piston', wandbox:'bash',              piston:'bash',       ext:'sh' }
+    'HTML':       { type:'web',      wandbox:null,                piston:null,         ext:'html' },
+    'CSS':        { type:'web',      wandbox:null,                piston:null,         ext:'css' },
+    'JavaScript': { type:'local-js', wandbox:null,                piston:null,         ext:'js' },
+    'TypeScript': { type:'piston',   wandbox:'typescript-5.3.3',  piston:'typescript', ext:'ts' },
+    'Python':     { type:'piston',   wandbox:'cpython-3.12.0',    piston:'python',     ext:'py' },
+    'Java':       { type:'piston',   wandbox:'openjdk-jdk-21+35', piston:'java',       ext:'java' },
+    'C':          { type:'piston',   wandbox:'gcc-13.2.0-c',      piston:'c',          ext:'c' },
+    'C++':        { type:'piston',   wandbox:'gcc-13.2.0',        piston:'c++',        ext:'cpp' },
+    'C#':         { type:'piston',   wandbox:'mono-6.12.0.199',   piston:'csharp',     ext:'cs' },
+    'Ruby':       { type:'piston',   wandbox:'ruby-3.3.0',        piston:'ruby',       ext:'rb' },
+    'Go':         { type:'piston',   wandbox:'go-1.22.0',         piston:'go',         ext:'go' },
+    'Rust':       { type:'piston',   wandbox:'rustc-1.76.0',      piston:'rust',       ext:'rs' },
+    'PHP':        { type:'piston',   wandbox:'php-8.3.2',         piston:'php',        ext:'php' },
+    'Swift':      { type:'piston',   wandbox:'swift-5.9.2',       piston:'swift',      ext:'swift' },
+    'Kotlin':     { type:'piston',   wandbox:'kotlin-1.9.22',     piston:'kotlin',     ext:'kt' },
+    'SQL':        { type:'piston',   wandbox:'sqlite-3.45.0',     piston:'sqlite3',    ext:'sql' },
+    'Bash':       { type:'piston',   wandbox:'bash',              piston:'bash',       ext:'sh' }
   }
 };
 
@@ -375,8 +368,56 @@ function useTerminalMode() {
   $('previewLabel').textContent = 'Terminal';
 }
 
-// ===== WANDBOX CALL (via CORS proxy) =====
-async function runWandbox(lang, cfg) {
+// ===== LOCAL JAVASCRIPT RUNNER =====
+function runLocalJS() {
+  useTerminalMode();
+  termClear();
+  termWrite('▶ Running JavaScript (browser)...', 'info');
+  $('previewStatus').textContent = 'Running...';
+
+  const token = 'jsout_' + Date.now();
+  const iframe = document.createElement('iframe');
+  iframe.sandbox = 'allow-scripts';
+  iframe.style.display = 'none';
+
+  const handler = function(e) {
+    if (e.data && e.data.token === token) {
+      window.removeEventListener('message', handler);
+      const { stdout, stderr } = e.data;
+      if (stdout) { termWrite('✅ Output:', 'ok'); termWrite(stdout); }
+      if (stderr) { termWrite('❌ Error:', 'err'); termWrite(stderr, 'err'); }
+      if (!stdout && !stderr) termWrite('(No output)', 'dim');
+      $('previewStatus').textContent = stderr ? '❌ Error' : '✅ Success';
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    }
+  };
+  window.addEventListener('message', handler);
+
+  const userCode = editor.value.replace(/<\/script>/gi, '<\\/script>');
+  iframe.srcdoc = `<script>
+    (function(){
+      var stdout = '', stderr = '';
+      function fmt(args) {
+        return Array.from(args).map(function(a){
+          try { return typeof a === 'object' ? JSON.stringify(a) : String(a); }
+          catch(_) { return String(a); }
+        }).join(' ');
+      }
+      console.log = function(){ stdout += fmt(arguments) + '\\n'; };
+      console.info = function(){ stdout += 'ℹ️ ' + fmt(arguments) + '\\n'; };
+      console.warn = function(){ stdout += '⚠️ ' + fmt(arguments) + '\\n'; };
+      console.error = function(){ stderr += fmt(arguments) + '\\n'; };
+      window.onerror = function(m, s, l){ stderr += m + ' (line ' + l + ')\\n'; return true; };
+      try { ${userCode} }
+      catch(e) { stderr += (e && e.message ? e.message : String(e)) + '\\n'; }
+      parent.postMessage({ token: '${token}', stdout: stdout, stderr: stderr }, '*');
+    })();
+  <\/script>`;
+  document.body.appendChild(iframe);
+}
+
+// ===== WANDBOX CALL =====
+async function runWandbox(cfg) {
   const body = {
     compiler: cfg.wandbox,
     code: editor.value,
@@ -389,14 +430,28 @@ async function runWandbox(lang, cfg) {
   let lastErr = null;
   for (const proxy of CONFIG.corsProxies) {
     try {
-      const url = proxy + encodeURIComponent(CONFIG.wandboxUrl);
+      let url;
+      if (proxy.includes('?')) {
+        url = proxy + encodeURIComponent(CONFIG.wandboxUrl);
+      } else {
+        url = proxy + CONFIG.wandboxUrl;
+      }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal: controller.signal
       });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
+      clearTimeout(timeout);
+
+      if (!res.ok) throw new Error('Proxy ' + res.status);
       const data = await res.json();
+      if (!data || typeof data !== 'object') throw new Error('Invalid shape');
+      if (data.error) throw new Error('Wandbox: ' + data.error);
       return data;
     } catch(e) {
       lastErr = e;
@@ -406,19 +461,28 @@ async function runWandbox(lang, cfg) {
   throw lastErr || new Error('All CORS proxies failed');
 }
 
-// ===== PISTON CALL (fallback) =====
-async function runPiston(lang, cfg) {
-  const res = await fetch(CONFIG.pistonUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      language: cfg.piston,
-      version: '*',
-      files: [{ name: `main.${cfg.ext}`, content: editor.value }]
-    })
-  });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  return await res.json();
+// ===== PISTON CALL =====
+async function runPiston(cfg) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(CONFIG.pistonUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        language: cfg.piston,
+        version: '*',
+        files: [{ name: `main.${cfg.ext}`, content: editor.value }]
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } catch(e) {
+    clearTimeout(timeout);
+    throw e;
+  }
 }
 
 // ===== RUN =====
@@ -427,132 +491,125 @@ async function run() {
   const cfg = CONFIG.languages[lang];
   if (!cfg) return;
 
-  $('previewStatus').textContent = 'Running...';
-
-  // === Web languages: iframe preview ===
-  if (cfg.type === 'web' && (lang === 'HTML' || lang === 'CSS')) {
+  // HTML
+  if (lang === 'HTML') {
     usePreviewMode();
-    const code = editor.value;
-    let html = '';
-    if (lang === 'HTML') html = code;
-    else if (lang === 'CSS') html = `<style>${code}</style><div style="padding:20px;font-family:sans-serif;">CSS Applied. Add HTML in the editor to see it styled.</div>`;
-    $('previewFrame').srcdoc = html;
+    $('previewFrame').srcdoc = editor.value;
     $('previewStatus').textContent = '✅ Rendered';
     return;
   }
-
-  // === JavaScript: try browser preview first ===
+  // CSS
+  if (lang === 'CSS') {
+    usePreviewMode();
+    $('previewFrame').srcdoc = `<style>${editor.value}</style>
+      <div style="padding:20px;font-family:sans-serif;color:#222;">
+        <h1>CSS Preview</h1>
+        <p>This is a sample paragraph to show your styles.</p>
+        <button>Button</button>
+      </div>`;
+    $('previewStatus').textContent = '✅ Rendered';
+    return;
+  }
+  // JavaScript (local, always works)
   if (lang === 'JavaScript') {
-    useTerminalMode();
-    termClear();
-    termWrite('▶ Running JavaScript (browser)...', 'info');
-    // Use a sandboxed iframe + postMessage trick to capture output
-    const iframe = document.createElement('iframe');
-    iframe.sandbox = 'allow-scripts';
-    iframe.style.display = 'none';
-    const token = 'jsout_' + Date.now();
-    window.addEventListener('message', function onMsg(e) {
-      if (e.data && e.data.token === token) {
-        window.removeEventListener('message', onMsg);
-        const { stdout, stderr } = e.data;
-        if (stdout) { termWrite('✅ Output:', 'ok'); termWrite(stdout); }
-        if (stderr) { termWrite('❌ Error:', 'err'); termWrite(stderr, 'err'); }
-        if (!stdout && !stderr) termWrite('(No output)', 'dim');
-        $('previewStatus').textContent = stderr ? '❌ Error' : '✅ Success';
-        document.body.removeChild(iframe);
-      }
-    });
-    iframe.srcdoc = `<script>
-      (function(){
-        var _log = console.log, _err = console.error, _warn = console.warn;
-        var stdout = '', stderr = '';
-        console.log = function(){ stdout += Array.from(arguments).join(' ') + '\\n'; };
-        console.warn = function(){ stdout += Array.from(arguments).join(' ') + '\\n'; };
-        console.error = function(){ stderr += Array.from(arguments).join(' ') + '\\n'; };
-        window.onerror = function(m){ stderr += m + '\\n'; };
-        try {
-          ${editor.value}
-        } catch(e) { stderr += e.message + '\\n'; }
-        parent.postMessage({ token: '${token}', stdout: stdout, stderr: stderr }, '*');
-      })();
-    <\/script>`;
-    document.body.appendChild(iframe);
+    runLocalJS();
     return;
   }
 
-  // === Other languages: Wandbox → Piston ===
+  // Other languages: Wandbox → Piston
   useTerminalMode();
   termClear();
-  termWrite('▶ Running ' + lang + ' (Wandbox)...', 'info');
+  termWrite('▶ Running ' + lang + '...', 'info');
+  $('previewStatus').textContent = 'Running...';
 
-  let usedFallback = false;
+  // Try Wandbox first
   try {
-    const data = await runWandbox(lang, cfg);
+    termWrite('  → Trying Wandbox...', 'dim');
+    const data = await runWandbox(cfg);
+
+    $('terminal').innerHTML = '';
+    termWrite('▶ Ran ' + lang + ' on Wandbox', 'info');
 
     const stdout = data.program_output || '';
     const stderr = data.program_error || '';
     const compilerErr = data.compiler_error || '';
     const compilerOut = data.compiler_output || '';
-    const status = data.status || '0';
+    const status = String(data.status || '0');
 
-    if (compilerErr || (status !== '0' && compilerErr)) {
+    if (compilerErr) {
       termWrite('❌ Compile Error:', 'err');
-      termWrite(compilerErr || compilerOut, 'err');
+      termWrite(compilerErr, 'err');
+      if (compilerOut) termWrite(compilerOut, 'dim');
       $('previewStatus').textContent = '❌ Compile error';
       return;
     }
-
     if (stdout) { termWrite('✅ Output:', 'ok'); termWrite(stdout); }
     if (stderr) { termWrite('❌ Runtime Error:', 'err'); termWrite(stderr, 'err'); }
-
     if (!stdout && !stderr) {
       termWrite('(No output)', 'dim');
-      $('previewStatus').textContent = '✅ Success (no output)';
+      $('previewStatus').textContent = '✅ Success';
     } else if (stderr) {
       $('previewStatus').textContent = '❌ Runtime error';
     } else {
       $('previewStatus').textContent = '✅ Success';
     }
-    termWrite('\n[exit code: ' + status + ']', 'dim');
+    if (status !== '0') termWrite('\n[exit code: ' + status + ']', 'dim');
     return;
-  } catch(e) {
-    console.warn('Wandbox failed, trying Piston...', e);
-    termWrite('⚠️ Wandbox unavailable, trying Piston...', 'info');
-    usedFallback = true;
+  } catch(wandboxErr) {
+    console.warn('Wandbox failed:', wandboxErr.message);
+    termWrite('⚠️ Wandbox unavailable: ' + wandboxErr.message, 'warn');
   }
 
-  // Piston fallback
-  if (usedFallback) {
-    try {
-      const data = await runPiston(lang, cfg);
-      const run = data.run || {};
-      const compile = data.compile || {};
+  // Fallback: Piston
+  try {
+    termWrite('  → Trying Piston fallback...', 'dim');
+    const data = await runPiston(cfg);
 
-      if (compile.stderr) {
-        termWrite('❌ Compile Error:', 'err');
-        termWrite(compile.stderr, 'err');
-        $('previewStatus').textContent = '❌ Compile error';
-        return;
-      }
-      if (run.stdout) { termWrite('✅ Output:', 'ok'); termWrite(run.stdout); }
-      if (run.stderr) {
-        termWrite('❌ Runtime Error:', 'err');
-        termWrite(run.stderr, 'err');
-        $('previewStatus').textContent = '❌ Runtime error';
-      } else if (run.stdout) {
-        $('previewStatus').textContent = '✅ Success';
-      } else {
-        termWrite('(No output)', 'dim');
-        $('previewStatus').textContent = '✅ Success (no output)';
-      }
-      if (run.code !== undefined) termWrite('\n[exit code: ' + run.code + ']', 'dim');
+    $('terminal').innerHTML = '';
+    termWrite('▶ Ran ' + lang + ' on Piston', 'info');
+
+    const run = data.run || {};
+    const compile = data.compile || {};
+
+    if (compile.stderr) {
+      termWrite('❌ Compile Error:', 'err');
+      termWrite(compile.stderr, 'err');
+      $('previewStatus').textContent = '❌ Compile error';
       return;
-    } catch(e2) {
-      termWrite('❌ All code runners failed: ' + e2.message, 'err');
-      termWrite('(Wandbox and Piston both unavailable.)', 'dim');
-      $('previewStatus').textContent = '❌ Failed';
     }
+    if (run.stdout) { termWrite('✅ Output:', 'ok'); termWrite(run.stdout); }
+    if (run.stderr) {
+      termWrite('❌ Runtime Error:', 'err');
+      termWrite(run.stderr, 'err');
+      $('previewStatus').textContent = '❌ Runtime error';
+    } else if (run.stdout) {
+      $('previewStatus').textContent = '✅ Success';
+    } else {
+      termWrite('(No output)', 'dim');
+      $('previewStatus').textContent = '✅ Success';
+    }
+    if (run.code !== undefined) termWrite('\n[exit code: ' + run.code + ']', 'dim');
+    return;
+  } catch(pistonErr) {
+    console.warn('Piston failed:', pistonErr.message);
+    termWrite('⚠️ Piston unavailable: ' + pistonErr.message, 'warn');
   }
+
+  // Both failed — helpful message
+  $('terminal').innerHTML = '';
+  termWrite('❌ ' + lang + ' execution unavailable right now', 'err');
+  termWrite('', 'dim');
+  termWrite('Both public code runners are temporarily offline:', 'warn');
+  termWrite('  • Wandbox (wandbox.org)', 'dim');
+  termWrite('  • Piston (emkc.org)', 'dim');
+  termWrite('', 'dim');
+  termWrite('Try again in a few minutes.', 'info');
+  termWrite('', 'dim');
+  termWrite('Languages that always work:', 'ok');
+  termWrite('  ✅ HTML — renders live in preview', 'dim');
+  termWrite('  ✅ CSS  — renders live in preview', 'dim');
+  termWrite('  ✅ JavaScript — runs in your browser', 'dim');
+  $('previewStatus').textContent = '⚠️ Service offline';
 }
 
 // ===== UPLOAD =====
@@ -785,4 +842,4 @@ function init() {
 init();
 </script>
 </body>
- </html>
+</html>
