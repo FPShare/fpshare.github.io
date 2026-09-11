@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-<title>FPShare</title>
+<title>Live Coder — FPShare</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -225,33 +225,44 @@ const CONFIG = {
   baseUrl: 'https://api.jsonbin.io/v3/b',
   groqUrl: 'https://api.groq.com/openai/v1/chat/completions',
   groqModel: 'llama-3.3-70b-versatile',
+
+  // ==== Code execution ====
+  wandboxUrl: 'https://wandbox.org/api/compile.json',
+  corsProxies: [
+    'https://corsproxy.io/?url=',
+    'https://api.allorigins.win/raw?url='
+  ],
   pistonUrl: 'https://emkc.org/api/v2/piston/execute',
 
+  // Language config
+  // wandbox: compiler id from wandbox.org
+  // piston:  language id for piston fallback
+  // type: 'web' = iframe preview | 'piston' = terminal via wandbox/piston
   languages: {
-    'HTML':       { type:'web',    piston:null,         ext:'html' },
-    'CSS':        { type:'web',    piston:null,         ext:'css' },
-    'JavaScript': { type:'web',    piston:'javascript', ext:'js' },
-    'TypeScript': { type:'piston', piston:'typescript', ext:'ts' },
-    'Python':     { type:'piston', piston:'python',     ext:'py' },
-    'Java':       { type:'piston', piston:'java',       ext:'java' },
-    'C':          { type:'piston', piston:'c',          ext:'c' },
-    'C++':        { type:'piston', piston:'c++',        ext:'cpp' },
-    'C#':         { type:'piston', piston:'csharp',     ext:'cs' },
-    'Ruby':       { type:'piston', piston:'ruby',       ext:'rb' },
-    'Go':         { type:'piston', piston:'go',         ext:'go' },
-    'Rust':       { type:'piston', piston:'rust',       ext:'rs' },
-    'PHP':        { type:'piston', piston:'php',        ext:'php' },
-    'Swift':      { type:'piston', piston:'swift',      ext:'swift' },
-    'Kotlin':     { type:'piston', piston:'kotlin',     ext:'kt' },
-    'SQL':        { type:'piston', piston:'sqlite3',    ext:'sql' },
-    'Bash':       { type:'piston', piston:'bash',       ext:'sh' }
+    'HTML':       { type:'web',    wandbox:null,                piston:null,         ext:'html' },
+    'CSS':        { type:'web',    wandbox:null,                piston:null,         ext:'css' },
+    'JavaScript': { type:'web',    wandbox:'nodejs-20.10.0',    piston:'javascript', ext:'js' },
+    'TypeScript': { type:'piston', wandbox:'typescript-5.3.3',  piston:'typescript', ext:'ts' },
+    'Python':     { type:'piston', wandbox:'cpython-3.12.0',    piston:'python',     ext:'py' },
+    'Java':       { type:'piston', wandbox:'openjdk-jdk-21+35', piston:'java',       ext:'java' },
+    'C':          { type:'piston', wandbox:'gcc-13.2.0-c',      piston:'c',          ext:'c' },
+    'C++':        { type:'piston', wandbox:'gcc-13.2.0',        piston:'c++',        ext:'cpp' },
+    'C#':         { type:'piston', wandbox:'mono-6.12.0.199',   piston:'csharp',     ext:'cs' },
+    'Ruby':       { type:'piston', wandbox:'ruby-3.3.0',        piston:'ruby',       ext:'rb' },
+    'Go':         { type:'piston', wandbox:'go-1.22.0',         piston:'go',         ext:'go' },
+    'Rust':       { type:'piston', wandbox:'rustc-1.76.0',      piston:'rust',       ext:'rs' },
+    'PHP':        { type:'piston', wandbox:'php-8.3.2',         piston:'php',        ext:'php' },
+    'Swift':      { type:'piston', wandbox:'swift-5.9.2',       piston:'swift',      ext:'swift' },
+    'Kotlin':     { type:'piston', wandbox:'kotlin-1.9.22',     piston:'kotlin',     ext:'kt' },
+    'SQL':        { type:'piston', wandbox:'sqlite-3.45.0',     piston:'sqlite3',    ext:'sql' },
+    'Bash':       { type:'piston', wandbox:'bash',              piston:'bash',       ext:'sh' }
   }
 };
 
 const $ = id => document.getElementById(id);
 const editor = $('codeEditor');
 let currentUser = null;
-let groqKey = null; // fetched at runtime from secret bin
+let groqKey = null;
 
 // ===== STATUS =====
 function setStatus(mode, msg) {
@@ -262,9 +273,8 @@ function setStatus(mode, msg) {
   else { dot.classList.add('offline'); text.textContent = msg||'Offline'; }
 }
 
-// ===== FETCH GROQ KEY FROM SECRET BIN =====
+// ===== FETCH GROQ KEY =====
 async function loadGroqKey(forceRefresh = false) {
-  // Check cache first (24h), unless forceRefresh
   if (!forceRefresh) {
     const cached = localStorage.getItem('groq_key_cache');
     if (cached) {
@@ -277,7 +287,6 @@ async function loadGroqKey(forceRefresh = false) {
       } catch(_){}
     }
   }
-
   try {
     const res = await fetch(`${CONFIG.baseUrl}/${CONFIG.secretBinId}/latest`, {
       headers: {
@@ -291,15 +300,14 @@ async function loadGroqKey(forceRefresh = false) {
     if (!key) throw new Error('No AI key in secret bin');
     groqKey = key;
     localStorage.setItem('groq_key_cache', JSON.stringify({ key, ts: Date.now() }));
-    console.log('✅ Groq key loaded from secret bin');
     return key;
   } catch (e) {
-    console.warn('❌ Groq key fetch failed:', e);
+    console.warn('Groq key fetch failed:', e);
     return null;
   }
 }
 
-// ===== DB HELPERS (FPShare bin) =====
+// ===== DB HELPERS =====
 async function fetchDB() {
   try {
     const res = await fetch(`${CONFIG.baseUrl}/${CONFIG.binId}/latest`, {
@@ -367,6 +375,52 @@ function useTerminalMode() {
   $('previewLabel').textContent = 'Terminal';
 }
 
+// ===== WANDBOX CALL (via CORS proxy) =====
+async function runWandbox(lang, cfg) {
+  const body = {
+    compiler: cfg.wandbox,
+    code: editor.value,
+    options: '',
+    stdin: '',
+    compiler_option_raw: '',
+    runtime_option_raw: ''
+  };
+
+  let lastErr = null;
+  for (const proxy of CONFIG.corsProxies) {
+    try {
+      const url = proxy + encodeURIComponent(CONFIG.wandboxUrl);
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      return data;
+    } catch(e) {
+      lastErr = e;
+      console.warn('Wandbox proxy failed:', proxy, e.message);
+    }
+  }
+  throw lastErr || new Error('All CORS proxies failed');
+}
+
+// ===== PISTON CALL (fallback) =====
+async function runPiston(lang, cfg) {
+  const res = await fetch(CONFIG.pistonUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      language: cfg.piston,
+      version: '*',
+      files: [{ name: `main.${cfg.ext}`, content: editor.value }]
+    })
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return await res.json();
+}
+
 // ===== RUN =====
 async function run() {
   const lang = $('languageSelect').value;
@@ -375,66 +429,129 @@ async function run() {
 
   $('previewStatus').textContent = 'Running...';
 
-  if (cfg.type === 'web') {
+  // === Web languages: iframe preview ===
+  if (cfg.type === 'web' && (lang === 'HTML' || lang === 'CSS')) {
     usePreviewMode();
     const code = editor.value;
     let html = '';
     if (lang === 'HTML') html = code;
     else if (lang === 'CSS') html = `<style>${code}</style><div style="padding:20px;font-family:sans-serif;">CSS Applied. Add HTML in the editor to see it styled.</div>`;
-    else if (lang === 'JavaScript') html = `<body style="background:#fff;font-family:monospace;padding:20px;"><div id="out"></div><script>
-      const origLog = console.log;
-      console.log = (...a) => { document.getElementById('out').innerHTML += a.join(' ') + '<br>'; origLog(...a); };
-      try { ${code} } catch(e) { document.getElementById('out').innerHTML += '<span style="color:red;">Error: '+e.message+'</span>'; }
-    <\/script></body>`;
     $('previewFrame').srcdoc = html;
     $('previewStatus').textContent = '✅ Rendered';
     return;
   }
 
+  // === JavaScript: try browser preview first ===
+  if (lang === 'JavaScript') {
+    useTerminalMode();
+    termClear();
+    termWrite('▶ Running JavaScript (browser)...', 'info');
+    // Use a sandboxed iframe + postMessage trick to capture output
+    const iframe = document.createElement('iframe');
+    iframe.sandbox = 'allow-scripts';
+    iframe.style.display = 'none';
+    const token = 'jsout_' + Date.now();
+    window.addEventListener('message', function onMsg(e) {
+      if (e.data && e.data.token === token) {
+        window.removeEventListener('message', onMsg);
+        const { stdout, stderr } = e.data;
+        if (stdout) { termWrite('✅ Output:', 'ok'); termWrite(stdout); }
+        if (stderr) { termWrite('❌ Error:', 'err'); termWrite(stderr, 'err'); }
+        if (!stdout && !stderr) termWrite('(No output)', 'dim');
+        $('previewStatus').textContent = stderr ? '❌ Error' : '✅ Success';
+        document.body.removeChild(iframe);
+      }
+    });
+    iframe.srcdoc = `<script>
+      (function(){
+        var _log = console.log, _err = console.error, _warn = console.warn;
+        var stdout = '', stderr = '';
+        console.log = function(){ stdout += Array.from(arguments).join(' ') + '\\n'; };
+        console.warn = function(){ stdout += Array.from(arguments).join(' ') + '\\n'; };
+        console.error = function(){ stderr += Array.from(arguments).join(' ') + '\\n'; };
+        window.onerror = function(m){ stderr += m + '\\n'; };
+        try {
+          ${editor.value}
+        } catch(e) { stderr += e.message + '\\n'; }
+        parent.postMessage({ token: '${token}', stdout: stdout, stderr: stderr }, '*');
+      })();
+    <\/script>`;
+    document.body.appendChild(iframe);
+    return;
+  }
+
+  // === Other languages: Wandbox → Piston ===
   useTerminalMode();
   termClear();
-  termWrite('▶ Running ' + lang + '...', 'info');
+  termWrite('▶ Running ' + lang + ' (Wandbox)...', 'info');
 
+  let usedFallback = false;
   try {
-    const res = await fetch(CONFIG.pistonUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        language: cfg.piston,
-        version: '*',
-        files: [{ name: `main.${cfg.ext}`, content: editor.value }]
-      })
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    const run = data.run || {};
-    const compile = data.compile || {};
+    const data = await runWandbox(lang, cfg);
 
-    if (compile.stderr) {
+    const stdout = data.program_output || '';
+    const stderr = data.program_error || '';
+    const compilerErr = data.compiler_error || '';
+    const compilerOut = data.compiler_output || '';
+    const status = data.status || '0';
+
+    if (compilerErr || (status !== '0' && compilerErr)) {
       termWrite('❌ Compile Error:', 'err');
-      termWrite(compile.stderr, 'err');
+      termWrite(compilerErr || compilerOut, 'err');
       $('previewStatus').textContent = '❌ Compile error';
       return;
     }
-    if (run.stdout) {
-      termWrite('✅ Output:', 'ok');
-      termWrite(run.stdout);
-    }
-    if (run.stderr) {
-      termWrite('❌ Runtime Error:', 'err');
-      termWrite(run.stderr, 'err');
-      $('previewStatus').textContent = '❌ Runtime error';
-    } else if (run.stdout) {
-      $('previewStatus').textContent = '✅ Success';
-    } else {
+
+    if (stdout) { termWrite('✅ Output:', 'ok'); termWrite(stdout); }
+    if (stderr) { termWrite('❌ Runtime Error:', 'err'); termWrite(stderr, 'err'); }
+
+    if (!stdout && !stderr) {
       termWrite('(No output)', 'dim');
       $('previewStatus').textContent = '✅ Success (no output)';
+    } else if (stderr) {
+      $('previewStatus').textContent = '❌ Runtime error';
+    } else {
+      $('previewStatus').textContent = '✅ Success';
     }
-    if (run.code !== undefined) termWrite('\n[exit code: ' + run.code + ']', 'dim');
+    termWrite('\n[exit code: ' + status + ']', 'dim');
+    return;
   } catch(e) {
-    termWrite('❌ Network Error: ' + e.message, 'err');
-    termWrite('(Piston API may be down. Try again.)', 'dim');
-    $('previewStatus').textContent = '❌ Failed';
+    console.warn('Wandbox failed, trying Piston...', e);
+    termWrite('⚠️ Wandbox unavailable, trying Piston...', 'info');
+    usedFallback = true;
+  }
+
+  // Piston fallback
+  if (usedFallback) {
+    try {
+      const data = await runPiston(lang, cfg);
+      const run = data.run || {};
+      const compile = data.compile || {};
+
+      if (compile.stderr) {
+        termWrite('❌ Compile Error:', 'err');
+        termWrite(compile.stderr, 'err');
+        $('previewStatus').textContent = '❌ Compile error';
+        return;
+      }
+      if (run.stdout) { termWrite('✅ Output:', 'ok'); termWrite(run.stdout); }
+      if (run.stderr) {
+        termWrite('❌ Runtime Error:', 'err');
+        termWrite(run.stderr, 'err');
+        $('previewStatus').textContent = '❌ Runtime error';
+      } else if (run.stdout) {
+        $('previewStatus').textContent = '✅ Success';
+      } else {
+        termWrite('(No output)', 'dim');
+        $('previewStatus').textContent = '✅ Success (no output)';
+      }
+      if (run.code !== undefined) termWrite('\n[exit code: ' + run.code + ']', 'dim');
+      return;
+    } catch(e2) {
+      termWrite('❌ All code runners failed: ' + e2.message, 'err');
+      termWrite('(Wandbox and Piston both unavailable.)', 'dim');
+      $('previewStatus').textContent = '❌ Failed';
+    }
   }
 }
 
@@ -474,7 +591,6 @@ async function askAI() {
   const out = $('aiOutput');
   out.style.display = 'block';
 
-  // Lazy-load Groq key on first AI request
   if (!groqKey) {
     out.textContent = '🔑 Loading AI key...';
     await loadGroqKey();
@@ -512,9 +628,7 @@ Answer concisely, helpfully, with code examples when relevant.`;
       })
     });
 
-    // If key rejected, clear cache and retry once
     if (res.status === 401) {
-      console.warn('⚠️ Groq key rejected. Refreshing from secret bin...');
       localStorage.removeItem('groq_key_cache');
       groqKey = null;
       await loadGroqKey(true);
@@ -584,7 +698,6 @@ function init() {
   setStatus('cloud','Cloud');
   setupMobileTabs();
 
-  // Pre-fetch AI key in background
   loadGroqKey().then(k => {
     if (k) console.log('🔑 AI ready');
     else console.warn('⚠️ AI key unavailable');
@@ -672,4 +785,4 @@ function init() {
 init();
 </script>
 </body>
-</html>
+ </html>
