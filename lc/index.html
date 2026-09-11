@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-<title>Code Share</title>
+<title>Live Coder — FPShare</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -33,7 +33,6 @@
   }
   input:focus, select:focus, textarea:focus { outline:2px solid #6C63FF; border-color:transparent; }
 
-  /* HEADER */
   header {
     background:#121212; padding:8px 0;
     border-bottom:1px solid #2A2A2A; flex-shrink:0;
@@ -74,67 +73,46 @@
   .nav-dropdown a i { width:18px; text-align:center; }
   .header-right { position:relative; }
 
-  /* WORKSPACE */
-  .workspace {
-    flex:1; display:flex; flex-direction:column;
-    min-height:0; overflow:hidden;
-  }
+  .workspace { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
   .toolbar {
     background:#161616; border-bottom:1px solid #2A2A2A;
     padding:8px 14px; display:flex; gap:8px; align-items:center;
     flex-wrap:wrap; flex-shrink:0;
   }
   .toolbar select, .toolbar input {
-    width:auto; min-width:120px; padding:6px 10px;
-    margin:0; font-size:0.85rem;
+    width:auto; min-width:120px; padding:6px 10px; margin:0; font-size:0.85rem;
   }
-  .panes {
-    flex:1; display:grid; grid-template-columns:1fr 1fr;
-    min-height:0; overflow:hidden;
-  }
-  .pane {
-    display:flex; flex-direction:column; min-height:0;
-    background:#0D0D0D; border-right:1px solid #2A2A2A;
-  }
+  .panes { flex:1; display:grid; grid-template-columns:1fr 1fr; min-height:0; overflow:hidden; }
+  .pane { display:flex; flex-direction:column; min-height:0; background:#0D0D0D; border-right:1px solid #2A2A2A; }
   .pane:last-child { border-right:none; }
   .pane-header {
-    background:#161616; padding:6px 12px;
-    font-size:0.8rem; color:#AAA; display:flex;
-    justify-content:space-between; align-items:center;
+    background:#161616; padding:6px 12px; font-size:0.8rem; color:#AAA;
+    display:flex; justify-content:space-between; align-items:center;
     border-bottom:1px solid #2A2A2A; flex-shrink:0;
   }
   .editor-wrap { flex:1; min-height:0; position:relative; overflow:hidden; }
   #codeEditor {
-    width:100%; height:100%; resize:none;
-    border:none; border-radius:0;
+    width:100%; height:100%; resize:none; border:none; border-radius:0;
     background:#0D0D0D; color:#E0E0E0;
     font-family:'Courier New', monospace; font-size:0.9rem;
-    padding:14px; line-height:1.5;
-    tab-size:4;
+    padding:14px; line-height:1.5; tab-size:4;
   }
   #codeEditor:focus { outline:none; }
 
-  #previewFrame {
-    width:100%; height:100%; border:none; background:#fff;
-    display:block;
-  }
+  #previewFrame { width:100%; height:100%; border:none; background:#fff; display:block; }
   #terminal {
-    width:100%; height:100%;
-    background:#000; color:#0f0;
+    width:100%; height:100%; background:#000; color:#0f0;
     font-family:'Courier New', monospace; font-size:0.85rem;
-    padding:12px; overflow-y:auto; white-space:pre-wrap;
-    word-break:break-word;
+    padding:12px; overflow-y:auto; white-space:pre-wrap; word-break:break-word;
   }
   #terminal .err { color:#ff5555; }
   #terminal .ok { color:#4CAF50; }
   #terminal .info { color:#6C63FF; }
   #terminal .dim { color:#888; }
 
-  /* AI PANEL */
   .ai-panel {
     background:#161616; border-top:1px solid #2A2A2A;
-    padding:10px 14px; flex-shrink:0;
-    display:none;
+    padding:10px 14px; flex-shrink:0; display:none;
   }
   .ai-panel.open { display:block; }
   .ai-panel h4 { font-size:0.85rem; color:#6C63FF; margin-bottom:8px; }
@@ -148,11 +126,9 @@
     font-family:'Courier New', monospace;
   }
 
-  /* MOBILE TABS */
   .mobile-tabs {
     display:none; background:#161616;
-    border-bottom:1px solid #2A2A2A; padding:6px 14px; gap:6px;
-    flex-shrink:0;
+    border-bottom:1px solid #2A2A2A; padding:6px 14px; gap:6px; flex-shrink:0;
   }
   .mobile-tabs button { flex:1; background:#2A2A2A; color:#888; }
   .mobile-tabs button.active { background:#6C63FF; color:#fff; }
@@ -183,8 +159,7 @@
     <div class="header-right">
       <button class="hamburger" id="hamburgerBtn"><i class="fas fa-ellipsis-v"></i></button>
       <nav class="nav-dropdown" id="navDropdown">
-        <a href="index.html"><i class="fas fa-home"></i> Code Share</a>
-        <a href="fpshare.html"><i class="fas fa-upload"></i> FPShare (Upload)</a>
+        <a href="/"><i class="fas fa-home"></i> FPShare (Home)</a>
         <a href="#" id="saveProjectBtn"><i class="fas fa-save"></i> Save Project</a>
         <a href="#" id="loadProjectBtn"><i class="fas fa-folder-open"></i> Open Project</a>
         <a href="#" id="toggleAiBtn"><i class="fas fa-robot"></i> AI Assistant</a>
@@ -195,7 +170,6 @@
 </header>
 
 <div class="workspace">
-  <!-- TOOLBAR -->
   <div class="toolbar">
     <select id="languageSelect"></select>
     <input type="text" id="fileName" placeholder="File name" value="untitled" style="min-width:140px;" />
@@ -204,13 +178,11 @@
     <button id="clearBtn" class="ghost"><i class="fas fa-eraser"></i> Clear</button>
   </div>
 
-  <!-- MOBILE TABS -->
   <div class="mobile-tabs">
     <button data-tab="editor" class="active"><i class="fas fa-code"></i> Editor</button>
     <button data-tab="preview"><i class="fas fa-eye"></i> Preview</button>
   </div>
 
-  <!-- PANES -->
   <div class="panes">
     <div class="pane mobile-active" id="pane-editor">
       <div class="pane-header"><span><i class="fas fa-code"></i> Editor</span><span id="editorLang">HTML</span></div>
@@ -222,14 +194,13 @@
     <div class="pane" id="pane-preview">
       <div class="pane-header">
         <span><i class="fas fa-eye"></i> <span id="previewLabel">Preview</span></span>
-        <span id="previewStatus" class="text-muted" style="color:#888;">Idle</span>
+        <span id="previewStatus" style="color:#888;">Idle</span>
       </div>
       <iframe id="previewFrame" sandbox="allow-scripts allow-modals allow-forms allow-popups"></iframe>
       <div id="terminal" style="display:none;"></div>
     </div>
   </div>
 
-  <!-- AI PANEL -->
   <div class="ai-panel" id="aiPanel">
     <h4><i class="fas fa-robot"></i> AI Coding Assistant</h4>
     <div class="ai-row">
@@ -361,7 +332,6 @@ async function run() {
   $('previewStatus').textContent = 'Running...';
 
   if (cfg.type === 'web') {
-    // Live preview in iframe
     usePreviewMode();
     const code = editor.value;
     let html = '';
@@ -377,7 +347,6 @@ async function run() {
     return;
   }
 
-  // Piston execution
   useTerminalMode();
   termClear();
   termWrite('▶ Running ' + lang + '...', 'info');
@@ -428,7 +397,7 @@ async function run() {
 // ===== UPLOAD =====
 async function uploadToCodeShare() {
   if (!currentUser) {
-    alert('Please login to Code Share (index.html) first, then come back.');
+    alert('Please login at FPShare first, then come back.');
     return;
   }
   const name = $('fileName').value.trim() || 'Untitled';
@@ -450,7 +419,7 @@ async function uploadToCodeShare() {
   };
   db.codes.push(newCode);
   const ok = await saveDB(db);
-  alert(ok ? '✅ Uploaded to Code Share!' : '⚠️ Saved locally, will sync.');
+  alert(ok ? '✅ Uploaded to FPShare!' : '⚠️ Saved locally, will sync.');
 }
 
 // ===== AI =====
@@ -509,7 +478,6 @@ function setupMobileTabs() {
 
 // ===== INIT =====
 function init() {
-  // Language dropdown
   const sel = $('languageSelect');
   Object.keys(CONFIG.languages).forEach(l => {
     const o = document.createElement('option');
@@ -519,7 +487,6 @@ function init() {
   sel.value = 'HTML';
   $('editorLang').textContent = 'HTML';
 
-  // Default code
   editor.value = `<h1 style="color:#6C63FF;">Hello from Live Coder!</h1>
 <p>Edit code and click <b>Run</b>.</p>
 <button onclick="alert('It works!')">Click Me</button>`;
@@ -528,7 +495,6 @@ function init() {
   setStatus('cloud','Cloud');
   setupMobileTabs();
 
-  // Events
   $('hamburgerBtn').addEventListener('click', e => {
     e.stopPropagation();
     $('navDropdown').classList.toggle('open');
@@ -550,7 +516,7 @@ function init() {
     currentUser = null;
     localStorage.removeItem('codeshare_user');
     $('logoutBtn').style.display = 'none';
-    alert('Logged out.');
+    window.location.href = '/';
   });
 
   $('toggleAiBtn').addEventListener('click', e => {
@@ -592,7 +558,6 @@ function init() {
     alert('✅ Loaded: ' + p.name);
   });
 
-  // Keyboard shortcut: Ctrl/Cmd+Enter to run
   document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
@@ -600,7 +565,6 @@ function init() {
     }
   });
 
-  // Tab key in editor inserts spaces
   editor.addEventListener('keydown', e => {
     if (e.key === 'Tab') {
       e.preventDefault();
@@ -613,4 +577,4 @@ function init() {
 init();
 </script>
 </body>
-  </html>
+</html>
