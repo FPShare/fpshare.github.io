@@ -46,6 +46,36 @@
   .review-item { border-bottom:1px solid #2A2A2A; padding:12px 0; }
   .review-item:last-child { border:none; }
   .star { color:#FFD700; letter-spacing:2px; }
+  .star-empty { color:#444; }
+
+  /* Rating display */
+  .rating-display {
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:0.85rem; color:#CCC;
+  }
+  .rating-display .stars { color:#FFD700; letter-spacing:1px; }
+  .rating-display .rating-num { font-weight:600; color:#FFD700; }
+  .rating-display .rating-count { color:#888; font-size:0.75rem; }
+  .rating-display .no-rating { color:#666; font-style:italic; font-size:0.8rem; }
+
+  /* Rating summary */
+  .rating-summary {
+    display:flex; gap:20px; align-items:center;
+    padding:16px; background:#161616;
+    border-radius:12px; border:1px solid #2A2A2A;
+    margin:12px 0;
+  }
+  .rating-summary .big-num {
+    font-size:2.5rem; font-weight:700; color:#FFD700;
+    line-height:1;
+  }
+  .rating-summary .big-stars {
+    color:#FFD700; font-size:1.3rem; letter-spacing:2px;
+  }
+  .rating-summary .summary-info { display:flex; flex-direction:column; gap:4px; }
+  .rating-summary .total-reviews {
+    color:#888; font-size:0.85rem;
+  }
 
   /* HEADER */
   header {
@@ -104,6 +134,7 @@
     #statusBar { font-size:0.65rem; padding:3px 10px 3px 6px; }
     .card { padding:16px; }
     .nav-dropdown { right:8px; min-width:180px; }
+    .rating-summary { flex-direction:column; gap:12px; text-align:center; }
   }
 </style>
 </head>
@@ -292,6 +323,39 @@ function setStatus(mode, msg) {
   else { dot.classList.add('offline'); text.textContent = msg||'Offline'; }
 }
 
+// ===== RATING HELPERS =====
+function getAverageRating(code) {
+  if (!code.reviews || code.reviews.length === 0) return null;
+  const sum = code.reviews.reduce((acc, r) => acc + (r.rating || 0), 0);
+  return sum / code.reviews.length;
+}
+
+function renderStars(avg) {
+  // Renders 5 stars, filled based on avg (supports half visually via opacity)
+  const full = Math.floor(avg);
+  const hasHalf = (avg - full) >= 0.25;
+  let s = '';
+  for (let i = 0; i < 5; i++) {
+    if (i < full) s += '<span class="star">★</span>';
+    else if (i === full && hasHalf) s += '<span class="star" style="opacity:0.6;">★</span>';
+    else s += '<span class="star-empty">★</span>';
+  }
+  return s;
+}
+
+function ratingBadge(code) {
+  const avg = getAverageRating(code);
+  const count = (code.reviews || []).length;
+  if (avg === null) {
+    return `<div class="rating-display"><span class="no-rating">No ratings yet</span></div>`;
+  }
+  return `<div class="rating-display">
+    <span class="stars">${renderStars(avg)}</span>
+    <span class="rating-num">${avg.toFixed(1)}</span>
+    <span class="rating-count">(${count})</span>
+  </div>`;
+}
+
 // ===== API =====
 async function fetchDB() {
   try {
@@ -379,7 +443,7 @@ function register(username, password) {
 }
 function isAdmin() { return currentUser && currentUser.role === 'admin'; }
 
-// ===== NAVIGATION (HASH) =====
+// ===== NAVIGATION =====
 function navigate(page) {
   $$('.page').forEach(p => p.classList.remove('active'));
   const target = $(`page-${page}`);
@@ -389,7 +453,6 @@ function navigate(page) {
   updateUI();
 }
 
-// ===== UI UPDATE =====
 function updateUI() {
   const loggedIn = !!currentUser;
   $('uploadNavLink').style.display = loggedIn ? 'flex' : 'none';
@@ -443,8 +506,9 @@ function renderTrending() {
   container.innerHTML = top.map(c => `
     <div class="card" style="cursor:pointer;" onclick="viewCode('${c.code_id}')">
       <h4>${c.name}</h4>
-      <div><span class="badge">${c.language}</span></div>
-      <div class="text-muted" style="font-size:0.8rem;">👁️ ${c.views || 0} ⭐ ${(c.reviews||[]).length}</div>
+      <div style="margin:4px 0;"><span class="badge">${c.language}</span></div>
+      ${ratingBadge(c)}
+      <div class="text-muted" style="font-size:0.8rem; margin-top:4px;">👁️ ${c.views || 0} views</div>
     </div>
   `).join('');
 }
@@ -454,14 +518,40 @@ window.viewCode = function(id) {
   if (!code) return alert('Code not found');
   code.views = (code.views || 0) + 1;
   saveDB();
+
+  const avg = getAverageRating(code);
+  const count = (code.reviews || []).length;
+
+  // Rating summary block
+  let summaryHtml;
+  if (avg === null) {
+    summaryHtml = `<div class="rating-summary">
+      <div class="summary-info">
+        <div class="big-stars" style="color:#444;">☆☆☆☆☆</div>
+        <div class="total-reviews">No reviews yet — be the first!</div>
+      </div>
+    </div>`;
+  } else {
+    summaryHtml = `<div class="rating-summary">
+      <div class="big-num">${avg.toFixed(1)}</div>
+      <div class="summary-info">
+        <div class="big-stars">${renderStars(avg)}</div>
+        <div class="total-reviews">${count} review${count === 1 ? '' : 's'}</div>
+      </div>
+    </div>`;
+  }
+
   const reviewsHtml = (code.reviews || []).map(r => `
     <div class="review-item">
-      <strong>${r.username}</strong>
-      <span class="star">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</span>
-      <p>${r.comment}</p>
+      <div class="flex-between">
+        <strong>${r.username}</strong>
+        <span class="star">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</span>
+      </div>
+      <p style="margin-top:6px;">${r.comment}</p>
       <span class="text-muted" style="font-size:0.7rem;">${new Date(r.timestamp).toLocaleDateString()}</span>
     </div>
   `).join('');
+
   const html = `
     <div style="position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this) this.remove()">
       <div class="card" style="max-width:700px; width:100%; max-height:90vh; overflow-y:auto; background:#1A1A1A;">
@@ -471,16 +561,27 @@ window.viewCode = function(id) {
         <p><strong>Description:</strong> ${code.description || 'No description'}</p>
         <p><strong>Tags:</strong> ${(code.tags||[]).join(', ') || 'None'}</p>
         <pre style="background:#0D0D0D; padding:16px; border-radius:10px; font-family:'Courier New', monospace; font-size:0.9rem; white-space:pre-wrap; word-wrap:break-word; max-height:300px; overflow-y:auto; border:1px solid #2A2A2A;">${code.content}</pre>
-        <hr style="border-color:#333; margin:12px 0;" />
-        <h4>Reviews</h4>
-        ${reviewsHtml || '<p class="text-muted">No reviews yet.</p>'}
+        <hr style="border-color:#333; margin:16px 0;" />
+        <h4 style="margin-bottom:8px;">Reviews &amp; Ratings</h4>
+        ${summaryHtml}
+        <div style="margin-top:12px;">
+          ${reviewsHtml || '<p class="text-muted">No reviews yet.</p>'}
+        </div>
         ${currentUser ? `
-          <div style="margin-top:12px;">
-            <select id="reviewRating"><option value="5">★★★★★</option><option value="4">★★★★☆</option><option value="3">★★★☆☆</option><option value="2">★★☆☆☆</option><option value="1">★☆☆☆☆</option></select>
+          <hr style="border-color:#333; margin:16px 0;" />
+          <h4 style="margin-bottom:8px;">Leave a Review</h4>
+          <div style="margin-top:8px;">
+            <select id="reviewRating">
+              <option value="5">★★★★★ — Excellent</option>
+              <option value="4">★★★★☆ — Good</option>
+              <option value="3">★★★☆☆ — Average</option>
+              <option value="2">★★☆☆☆ — Poor</option>
+              <option value="1">★☆☆☆☆ — Terrible</option>
+            </select>
             <textarea id="reviewComment" placeholder="Your review..." rows="2"></textarea>
             <button onclick="submitReview('${code.code_id}')">Post Review</button>
           </div>
-        ` : '<p class="text-muted">Login to post a review.</p>'}
+        ` : '<p class="text-muted" style="margin-top:12px;">Login to post a review.</p>'}
       </div>
     </div>
   `;
@@ -494,14 +595,24 @@ window.submitReview = async function(codeId) {
   const code = db.codes.find(c => c.code_id === codeId);
   if (!code) return alert('Code not found');
   if (!code.reviews) code.reviews = [];
-  code.reviews.push({
+
+  // One review per user — replace if exists
+  const existingIdx = code.reviews.findIndex(r => r.username === currentUser.username);
+  const newReview = {
     username: currentUser.username, rating, comment,
     timestamp: new Date().toISOString()
-  });
+  };
+  if (existingIdx >= 0) {
+    code.reviews[existingIdx] = newReview;
+  } else {
+    code.reviews.push(newReview);
+  }
+
   await saveDB();
   alert('Review posted!');
   document.querySelector('div[style*="fixed"]')?.remove();
   viewCode(codeId);
+  renderTrending();
 };
 
 // ===== SEARCH =====
@@ -521,8 +632,9 @@ function performSearch() {
   container.innerHTML = results.map(c => `
     <div class="card" style="cursor:pointer;" onclick="viewCode('${c.code_id}')">
       <h4>${c.name}</h4>
-      <div><span class="badge">${c.language}</span></div>
-      <div class="text-muted" style="font-size:0.8rem;">👁️ ${c.views||0} ⭐ ${(c.reviews||[]).length}</div>
+      <div style="margin:4px 0;"><span class="badge">${c.language}</span></div>
+      ${ratingBadge(c)}
+      <div class="text-muted" style="font-size:0.8rem; margin-top:4px;">👁️ ${c.views||0} views</div>
     </div>
   `).join('');
 }
@@ -547,15 +659,22 @@ function renderAdmin() {
     });
   });
   const codeContainer = $('adminCodeList');
-  codeContainer.innerHTML = db.codes.map(c => `
-    <div class="flex-between" style="border-bottom:1px solid #2A2A2A; padding:8px 0;">
-      <span><strong>${c.name}</strong> (${c.language}) by ${c.uploader}</span>
-      <div>
-        <button class="admin-edit-code" data-id="${c.code_id}" style="background:#1976d2; padding:2px 12px; min-height:auto;">Edit</button>
-        <button class="admin-delete-code" data-id="${c.code_id}" style="background:#d32f2f; padding:2px 12px; min-height:auto;">Delete</button>
+  codeContainer.innerHTML = db.codes.map(c => {
+    const avg = getAverageRating(c);
+    const ratingTxt = avg === null ? 'No rating' : `⭐ ${avg.toFixed(1)} (${(c.reviews||[]).length})`;
+    return `
+      <div class="flex-between" style="border-bottom:1px solid #2A2A2A; padding:8px 0;">
+        <div>
+          <strong>${c.name}</strong> (${c.language}) by ${c.uploader}
+          <div class="text-muted" style="font-size:0.75rem;">${ratingTxt} • 👁️ ${c.views||0}</div>
+        </div>
+        <div>
+          <button class="admin-edit-code" data-id="${c.code_id}" style="background:#1976d2; padding:2px 12px; min-height:auto;">Edit</button>
+          <button class="admin-delete-code" data-id="${c.code_id}" style="background:#d32f2f; padding:2px 12px; min-height:auto;">Delete</button>
+        </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
   codeContainer.querySelectorAll('.admin-delete-code').forEach(btn => {
     btn.addEventListener('click', async () => {
       if (confirm('Delete this code?')) {
@@ -614,7 +733,6 @@ async function handleUpload() {
 
 // ===== INIT =====
 async function init() {
-  // Populate languages
   ['uploadLanguage','searchLanguage'].forEach(id => {
     const sel = $(id);
     if (!sel) return;
@@ -626,25 +744,21 @@ async function init() {
 
   await fetchDB();
 
-  // Load session
   const s = localStorage.getItem('codeshare_user');
   if (s) { try { currentUser = JSON.parse(s); } catch(_){} }
 
   updateUI();
   renderTrending();
 
-  // Route from hash
   const hash = window.location.hash.replace('#','') || 'home';
   if ($('page-' + hash)) navigate(hash); else navigate('home');
 
-  // Hamburger
   $('hamburgerBtn').addEventListener('click', e => {
     e.stopPropagation();
     $('navDropdown').classList.toggle('open');
   });
   document.addEventListener('click', () => $('navDropdown').classList.remove('open'));
 
-  // Hash navigation
   window.addEventListener('hashchange', () => {
     const p = window.location.hash.replace('#','') || 'home';
     if ($('page-' + p)) {
@@ -654,7 +768,6 @@ async function init() {
     }
   });
 
-  // Nav links
   document.querySelectorAll('[data-page]').forEach(link => {
     link.addEventListener('click', e => {
       e.preventDefault();
@@ -662,15 +775,10 @@ async function init() {
     });
   });
 
-  // Login / Register links
-  $('loginNavLink').addEventListener('click', e => { e.preventDefault();
-    navigate('login'); });
-  $('registerNavLink').addEventListener('click', e => { e.preventDefault();
-    navigate('register'); });
-  $('logoutNavLink').addEventListener('click', e => { e.preventDefault();
-    logout(); });
+  $('loginNavLink').addEventListener('click', e => { e.preventDefault(); navigate('login'); });
+  $('registerNavLink').addEventListener('click', e => { e.preventDefault(); navigate('register'); });
+  $('logoutNavLink').addEventListener('click', e => { e.preventDefault(); logout(); });
 
-  // Login
   $('loginBtn').addEventListener('click', () => {
     const u = $('loginUsername').value.trim();
     const p = $('loginPassword').value.trim();
@@ -682,7 +790,6 @@ async function init() {
     }
   });
 
-  // Register
   $('registerBtn').addEventListener('click', () => {
     const u = $('regUsername').value.trim();
     const p = $('regPassword').value.trim();
@@ -695,7 +802,6 @@ async function init() {
     }
   });
 
-  // Search
   $('searchBtn').addEventListener('click', performSearch);
   $('clearSearchBtn').addEventListener('click', () => {
     $('searchInput').value = '';
@@ -704,10 +810,8 @@ async function init() {
   });
   $('searchInput').addEventListener('keyup', e => { if (e.key === 'Enter') performSearch(); });
 
-  // Upload
   $('uploadSubmitBtn').addEventListener('click', handleUpload);
 
-  // Account
   $('changeUsernameBtn').addEventListener('click', async () => {
     const newU = $('newUsername').value.trim();
     if (!newU) return alert('Enter new username.');
@@ -746,7 +850,6 @@ async function init() {
     alert('Account deleted.');
   });
 
-  // Admin: create admin
   $('createAdminBtn').addEventListener('click', async () => {
     if (!isAdmin()) return alert('Admin only.');
     const u = $('adminNewUser').value.trim();
@@ -765,7 +868,6 @@ async function init() {
     alert('Admin created.');
   });
 
-  // Admin render on nav
   $('adminNavLink').addEventListener('click', () => { if (isAdmin()) renderAdmin(); });
 
   console.log('FPShare ready.');
